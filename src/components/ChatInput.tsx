@@ -48,6 +48,7 @@ export function ChatInput({ value, onChange, onSubmit, isTyping }: ChatInputProp
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const valueRef = useRef(value);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -55,6 +56,11 @@ export function ChatInput({ value, onChange, onSubmit, isTyping }: ChatInputProp
   const MAX_ROWS = 4;
   const LINE_HEIGHT = 20;
   const MAX_HEIGHT = LINE_HEIGHT * MAX_ROWS;
+
+  // Keep valueRef in sync with prop
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -71,8 +77,8 @@ export function ChatInput({ value, onChange, onSubmit, isTyping }: ChatInputProp
           for (let i = event.resultIndex; i < event.results.length; i++) {
             transcript += event.results[i][0].transcript;
           }
-          // Append transcript to current value
-          onChange(value + transcript);
+          // Use ref for current value to avoid stale closure
+          onChange(valueRef.current + transcript);
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {

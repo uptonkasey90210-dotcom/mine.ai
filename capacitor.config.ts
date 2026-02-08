@@ -6,7 +6,9 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     androidScheme: 'http',
-    allowNavigation: ['*']
+    iosScheme: 'capacitor',
+    allowNavigation: ['*'],
+    cleartext: true,
   }
 };
 

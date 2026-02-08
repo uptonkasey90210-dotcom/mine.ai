@@ -1,7 +1,17 @@
 import { motion } from "framer-motion";
 import { Sparkles, ChevronRight } from "lucide-react";
 
-export function WelcomeBanner() {
+interface WelcomeBannerProps {
+  onSuggestionClick?: (text: string) => void;
+}
+
+export function WelcomeBanner({ onSuggestionClick }: WelcomeBannerProps) {
+  const suggestions = [
+    { label: "Write code", prompt: "Help me write some code" },
+    { label: "Explain concepts", prompt: "Explain a concept to me" },
+    { label: "Brainstorm ideas", prompt: "Help me brainstorm ideas" },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -19,14 +29,16 @@ export function WelcomeBanner() {
         Your personal AI assistant. Ask me anything to get started.
       </p>
       <div className="flex flex-wrap justify-center gap-2 mt-5">
-        {["Write code", "Explain concepts", "Brainstorm ideas"].map((tag) => (
-          <span
-            key={tag}
-            className="flex items-center gap-1.5 text-[11px] text-zinc-400 bg-zinc-900/80 rounded-full px-3 py-1.5 border border-zinc-800/60"
+        {suggestions.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => onSuggestionClick?.(s.prompt)}
+            className="flex items-center gap-1.5 text-[11px] text-zinc-400 bg-zinc-900/80 rounded-full px-3 py-1.5 border border-zinc-800/60 hover:bg-zinc-800/80 hover:text-zinc-200 hover:border-zinc-700 transition-all active:scale-95 cursor-pointer"
           >
             <ChevronRight size={11} className="text-blue-400" />
-            {tag}
-          </span>
+            {s.label}
+          </button>
         ))}
       </div>
     </motion.div>

@@ -12,9 +12,10 @@ interface ChatAreaProps {
   isTyping: boolean;
   bubbleStyle?: "default" | "modern" | "compact";
   characterAvatar?: string; // Optional character avatar
+  onSuggestionClick?: (text: string) => void;
 }
 
-export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar }: ChatAreaProps) {
+export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characterAvatar, onSuggestionClick }: ChatAreaProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const messages = useLiveQuery(
@@ -34,7 +35,7 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
   return (
     <div className="flex-1 overflow-y-auto overscroll-contain pt-[calc(60px+env(safe-area-inset-top))] pb-[calc(110px+env(safe-area-inset-bottom))]">
       {shouldShowWelcome ? (
-        <WelcomeBanner />
+        <WelcomeBanner onSuggestionClick={onSuggestionClick} />
       ) : (
         <>
           <DateDivider label="Today" />

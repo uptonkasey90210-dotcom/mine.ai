@@ -294,25 +294,18 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
     setConnectionStatus("testing");
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const result = await fetchModels(localApiUrl);
 
-      const response = await fetch(`${localApiUrl.replace(/\/v1\/chat\/completions$/, "")}/api/tags`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
+      if (result.success) {
         setConnectionStatus("success");
-        setTimeout(() => setConnectionStatus("idle"), 3000);
+        if (result.models.length > 0) {
+          setAvailableModels(result.models);
+        }
       } else {
-        console.error("Connection test failed:", response.status, response.statusText);
+        console.error("Connection test failed:", result.error);
         setConnectionStatus("error");
-        setTimeout(() => setConnectionStatus("idle"), 3000);
       }
+      setTimeout(() => setConnectionStatus("idle"), 3000);
     } catch (error) {
       console.error("Connection test error:", error);
       setConnectionStatus("error");
@@ -352,7 +345,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
               type="text"
               value={localApiUrl}
               onChange={(e) => setLocalApiUrl(e.target.value)}
-              placeholder="http://localhost:11434/v1/chat/completions"
+              placeholder="http://192.168.1.100:11434"
               className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
             />
           </div>

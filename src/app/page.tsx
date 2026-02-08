@@ -207,8 +207,8 @@ export default function MineAIChat() {
     if (currentCharacter) {
       systemPrompt = `You are ${currentCharacter.name}. ${currentCharacter.description}. Your traits are: ${currentCharacter.definition}`;
     } else {
-      // Fallback: Use hardcoded default for non-character chats
-      systemPrompt = "You are mine.ai, a private, local-first AI assistant.";
+      // Use user's custom system prompt from settings, or safe default
+      systemPrompt = settings.systemPrompt || "You are mine.ai, a private, local-first AI assistant.";
     }
 
     // Prepare message history
@@ -383,6 +383,7 @@ export default function MineAIChat() {
           isTyping={isTyping} 
           bubbleStyle={bubbleStyle as any}
           characterAvatar={activeCharacter?.avatar}
+          onSuggestionClick={(text) => handleSend(text)}
         />
         <div ref={scrollRef} />
 

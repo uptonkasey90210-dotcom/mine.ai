@@ -18,6 +18,40 @@ interface OpenAIResponse {
   data?: OpenAIModel[];
 }
 
+/**
+ * Build the chat completions URL from a user-provided API base URL.
+ * Handles cases where user enters:
+ * - Base URL only: http://localhost:11434 → /v1/chat/completions
+ * - Full path: http://localhost:11434/v1/chat/completions → as-is
+ * - Ollama native path: http://localhost:11434/api/chat → kept as-is
+ */
+function buildChatCompletionUrl(apiUrl: string): string {
+  const cleanUrl = apiUrl.replace(/\/+$/, '');
+
+  // Already a full chat completions URL
+  if (/\/chat\/completions$/i.test(cleanUrl)) {
+    return cleanUrl;
+  }
+
+  // Ollama native endpoint — keep as-is (parser handles NDJSON)
+  if (cleanUrl.endsWith('/api/chat')) {
+    return cleanUrl;
+  }
+
+  // Base URL only — append OpenAI-compatible endpoint
+  return `${cleanUrl}/v1/chat/completions`;
+}
+
+/**
+ * Extract the base URL from a user-provided API URL.
+ * Strips known API paths to get the root server address.
+ */
+function getBaseUrl(apiUrl: string): string {
+  return apiUrl
+    .replace(/\/+$/, '')
+    .replace(/\/(v1\/chat\/completions|api\/chat|v1\/models|api\/tags)$/i, '');
+}
+
 export interface StreamOptions {
   apiUrl: string;
   modelName: string;
@@ -48,7 +82,10 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
   } = options;
 
   try {
-    const response = await fetch(apiUrl, {
+    // Construct absolute URL — defaults to OpenAI-compatible /v1/chat/completions
+    const targetUrl = buildChatCompletionUrl(apiUrl);
+    
+    const response = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -93,29 +130,42 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
           continue;
         }
 
-        if (trimmed.startsWith("data: ")) {
-          try {
-            const json = JSON.parse(trimmed.slice(6));
-            
-            // Handle different API response formats
-            const content = 
-              json.choices?.[0]?.delta?.content ||
-              json.response ||
-              json.message?.content ||
-              "";
+        try {
+          let json;
 
-            if (content) {
-              onChunk(content);
-            }
-
-            // Some models might include thinking/reasoning
-            const thinking = json.choices?.[0]?.delta?.thinking || json.thinking;
-            if (thinking && onThinking) {
-              onThinking(thinking);
-            }
-          } catch (e) {
-            console.warn("Failed to parse streaming chunk:", e);
+          if (trimmed.startsWith("data: ")) {
+            // SSE format (OpenAI-compatible: Ollama /v1, LM Studio, etc.)
+            json = JSON.parse(trimmed.slice(6));
+          } else if (trimmed.startsWith("{")) {
+            // NDJSON format (Ollama native /api/chat)
+            json = JSON.parse(trimmed);
+          } else {
+            continue;
           }
+
+          // Skip Ollama "done" signal (empty content, stats only)
+          if (json.done === true) {
+            continue;
+          }
+
+          // Handle different API response formats
+          const content =
+            json.choices?.[0]?.delta?.content || // OpenAI streaming delta
+            json.message?.content ||             // Ollama native streaming chunk
+            json.response ||                      // Legacy format
+            "";
+
+          if (content) {
+            onChunk(content);
+          }
+
+          // Handle thinking/reasoning tokens
+          const thinking = json.choices?.[0]?.delta?.thinking || json.thinking;
+          if (thinking && onThinking) {
+            onThinking(thinking);
+          }
+        } catch (e) {
+          console.warn("Failed to parse streaming chunk:", e);
         }
       }
     }
@@ -134,8 +184,10 @@ export async function fetchModels(
   baseUrl: string
 ): Promise<{ success: boolean; models: string[]; error?: string }> {
   try {
+    // Construct absolute URL - strip any path to get base server address
+    const cleanUrl = getBaseUrl(baseUrl);
     // Try Ollama format first
-    const ollamaUrl = baseUrl.replace(/\/v1\/chat\/completions$/, '') + '/api/tags';
+    const ollamaUrl = cleanUrl + '/api/tags';
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -158,7 +210,7 @@ export async function fetchModels(
     }
 
     // Fallback to OpenAI format
-    const openaiUrl = baseUrl.replace(/\/chat\/completions$/, '') + '/models';
+    const openaiUrl = cleanUrl + '/v1/models';
     const openaiResponse = await fetch(openaiUrl);
     
     if (openaiResponse.ok) {
@@ -199,7 +251,10 @@ export async function testAPIConnection(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(apiUrl, {
+    // Construct absolute URL — use same endpoint as streaming
+    const targetUrl = buildChatCompletionUrl(apiUrl);
+    
+    const response = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

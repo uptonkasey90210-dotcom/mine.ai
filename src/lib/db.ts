@@ -68,7 +68,7 @@ export const db = new MineAIDatabase();
 
 // ─── Default Settings ────────────────────────────────────────────
 export const DEFAULT_SETTINGS = {
-  apiUrl: "http://localhost:11434/v1/chat/completions",
+  apiUrl: "http://localhost:11434",
   modelName: "llama2",
   systemPrompt: "You are a helpful AI assistant named mine.ai. Be concise, clear, and friendly.",
   temperature: 0.7,
