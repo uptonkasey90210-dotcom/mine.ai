@@ -1,4 +1,5 @@
 import { getSetting } from "./db";
+import { resilientFetch, NetworkError, isDeviceOffline } from "./network";
 
 // Type definitions for API responses
 interface OllamaModel {
@@ -88,10 +89,19 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
   } = options;
 
   try {
+    /* REFACTOR: Pre-flight offline check — fail fast before opening connection */
+    if (isDeviceOffline()) {
+      throw new NetworkError("offline", "Device is offline");
+    }
+
     // Construct absolute URL — defaults to OpenAI-compatible /v1/chat/completions
     const targetUrl = buildChatCompletionUrl(apiUrl);
     
-    const response = await fetch(targetUrl, {
+    /* REFACTOR: Use resilientFetch with 3s timeout for LAN, 10s for remote.
+       Streaming requests use a longer initial timeout since the first token
+       may take a few seconds on slow hardware. The stream itself has no
+       timeout — once the first byte arrives, we rely on AbortController. */
+    const response = await resilientFetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -108,11 +118,9 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
         ...(contextLength ? { num_ctx: contextLength } : {}),
       }),
       signal,
+      /* Streaming first-byte timeout: allow more time for model loading */
+      timeoutMs: 15000,
     });
-
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
 
     const reader = response.body?.getReader();
     if (!reader) {
@@ -181,7 +189,12 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
 
     onComplete();
   } catch (error) {
-    onError(error instanceof Error ? error : new Error(String(error)));
+    /* REFACTOR: Propagate NetworkError directly for structured error handling */
+    if (error instanceof NetworkError) {
+      onError(error);
+    } else {
+      onError(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
@@ -195,50 +208,36 @@ export async function fetchModels(
   try {
     // Construct absolute URL - strip any path to get base server address
     const cleanUrl = getBaseUrl(baseUrl);
-    // Try Ollama format first
+
+    /* REFACTOR: Try Ollama format first with resilientFetch (auto-timeout) */
     const ollamaUrl = cleanUrl + '/api/tags';
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    const response = await fetch(ollamaUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (response.ok) {
+    try {
+      const response = await resilientFetch(ollamaUrl, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      });
       const data = await response.json() as OllamaResponse;
-      // Ollama returns { models: [{ name: "...", ... }] }
       const models = data.models?.map((m) => m.name || m.id || "") || [];
       return { success: true, models: models.filter(Boolean) };
+    } catch {
+      /* Ollama endpoint not available — try OpenAI format */
     }
 
-    // Fallback to OpenAI format
+    /* REFACTOR: OpenAI fallback now also uses resilientFetch with timeout */
     const openaiUrl = cleanUrl + '/v1/models';
-    const openaiResponse = await fetch(openaiUrl);
-    
-    if (openaiResponse.ok) {
-      const data = await openaiResponse.json() as OpenAIResponse;
-      const models = data.data?.map((m) => m.id) || [];
-      return { success: true, models };
-    }
-
-    return {
-      success: false,
-      models: [],
-      error: "Could not fetch models from API",
-    };
+    const openaiResponse = await resilientFetch(openaiUrl, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+    const data = await openaiResponse.json() as OpenAIResponse;
+    const models = data.data?.map((m) => m.id) || [];
+    return { success: true, models };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (error instanceof NetworkError) {
       return {
         success: false,
         models: [],
-        error: "Connection timeout",
+        error: error.userMessage,
       };
     }
     return {
@@ -257,13 +256,10 @@ export async function testAPIConnection(
   modelName: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    // Construct absolute URL — use same endpoint as streaming
+    /* REFACTOR: resilientFetch handles timeout, offline, and error classification */
     const targetUrl = buildChatCompletionUrl(apiUrl);
     
-    const response = await fetch(targetUrl, {
+    await resilientFetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -274,25 +270,16 @@ export async function testAPIConnection(
         max_tokens: 1,
         stream: false,
       }),
-      signal: controller.signal,
+      /* Connection test uses shorter timeout — user is waiting for feedback */
+      timeoutMs: 5000,
     });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return {
-        success: false,
-        error: `HTTP ${response.status}: ${errorText.slice(0, 200)}`,
-      };
-    }
 
     return { success: true };
   } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (error instanceof NetworkError) {
       return {
         success: false,
-        error: "Connection timeout. Check your API URL and network.",
+        error: error.userMessage,
       };
     }
     return {

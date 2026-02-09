@@ -18,6 +18,9 @@ import {
   type Character,
 } from "@/lib/db";
 import { streamAIResponse, testAPIConnection } from "@/lib/api";
+import { NetworkError } from "@/lib/network";
+import { truncateToFit, type ChatMessage } from "@/lib/tokenizer";
+import { onAppStateChange } from "@/lib/lifecycle";
 import { parseFile, formatFileContext } from "@/lib/parser";
 import { Sidebar } from "@/components/Sidebar";
 import { SettingsSheet } from "@/components/SettingsSheet";
@@ -25,6 +28,7 @@ import { ChatHeader } from "@/components/ChatHeader";
 import { ChatArea } from "@/components/ChatArea";
 import { ChatInput } from "@/components/ChatInput";
 import { CharacterProfileSheet } from "@/components/Character/CharacterProfileSheet";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -72,6 +76,35 @@ export default function MineAIChat() {
     testConnection();
   }, []); // Run once on mount
 
+  /* REFACTOR: Zombie State handler — abort stale streams when app resumes
+     after being backgrounded by iOS/Android. Prevents stuck isTyping state
+     and partial AI messages. */
+  useEffect(() => {
+    const unsubscribe = onAppStateChange((isActive) => {
+      if (isActive) {
+        /* App just resumed from background */
+        if (abortControllerRef.current) {
+          /* A stream was in-flight when the app was frozen.
+             The TCP connection is likely dead. Abort and clean up. */
+          abortControllerRef.current.abort();
+          abortControllerRef.current = null;
+          setIsTyping(false);
+
+          /* Re-test connection — server may have shut down while we were away */
+          getAllSettings().then((settings) => {
+            if (settings.apiUrl && settings.modelName) {
+              testAPIConnection(settings.apiUrl, settings.modelName).then(
+                (result) => setModelStatus(result.success ? "online" : "offline")
+              );
+            }
+          });
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
   // Load active character when characterId changes
   useEffect(() => {
     if (activeCharacterId) {
@@ -98,22 +131,9 @@ export default function MineAIChat() {
     }
   }, [activeThreadId]);
 
-  // Apply accent color dynamically from settings
-  const accentColor = useLiveQuery(() => getSetting("accent_color"));
-  useEffect(() => {
-    if (accentColor) {
-      document.documentElement.style.setProperty("--accent-color", accentColor);
-    }
-  }, [accentColor]);
-
-  // Apply text size dynamically from settings
-  const textSize = useLiveQuery(() => getSetting("font_size_modifier"));
-  useEffect(() => {
-    if (textSize) {
-      const sizeMap: Record<string, string> = { small: "14px", medium: "16px", large: "18px" };
-      document.documentElement.style.fontSize = sizeMap[textSize] || "16px";
-    }
-  }, [textSize]);
+  /* REFACTOR: Removed duplicated accent color & font size effects.
+     ThemeManager already handles these via useLiveQuery → DOM.
+     Having them here caused race conditions on initial load. */
 
   // Get bubble style from settings
   const bubbleStyle = useLiveQuery(() => getSetting("bubble_style")) || "default";
@@ -222,18 +242,42 @@ export default function MineAIChat() {
       .equals(threadId)
       .sortBy("timestamp");
 
-    const apiMessages = history
+    const rawMessages: ChatMessage[] = history
       .filter((m) => m.role !== "ai" || m.content) // Exclude empty AI messages
-      .slice(-10) // Last 10 messages for context
       .map((m) => ({
         role: m.role === "ai" ? ("assistant" as const) : ("user" as const),
         content: m.content,
       }));
 
     // Replace the last user message with the RAG-enhanced version
-    if (apiMessages.length > 0 && apiMessages[apiMessages.length - 1].role === "user") {
-      apiMessages[apiMessages.length - 1].content = userMessage;
+    if (rawMessages.length > 0 && rawMessages[rawMessages.length - 1].role === "user") {
+      rawMessages[rawMessages.length - 1].content = userMessage;
     }
+
+    /* REFACTOR: Token-aware sliding window truncation.
+       Replaces naive slice(-10) — now respects the configured context_length,
+       estimates token usage, and leaves 25% headroom for the model's response.
+       System prompt and the latest user message are always preserved. */
+    const truncationResult = truncateToFit(
+      systemPrompt,
+      rawMessages,
+      settings.context_length || 4096
+    );
+
+    if (truncationResult.truncated) {
+      console.info(
+        `[context] Truncated: ${truncationResult.originalCount} → ${truncationResult.finalCount} messages (≈${truncationResult.estimatedTokens} tokens)`
+      );
+    }
+
+    /* The truncated messages already include the system prompt at index 0.
+       Strip it out since streamAIResponse adds it separately. */
+    const apiMessages = truncationResult.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
 
     let accumulatedRawContent = "";
     let accumulatedThinking = "";
@@ -301,10 +345,16 @@ export default function MineAIChat() {
             abortControllerRef.current = null;
             return;
           }
+          /* REFACTOR: Structured error handling with user-friendly messages.
+             NetworkError provides pre-classified error kinds (offline, timeout,
+             unreachable) with actionable user messages. */
           console.error("Streaming error:", error);
           setModelStatus("offline");
+          const userMsg = error instanceof NetworkError
+            ? error.userMessage
+            : `Error: ${error.message}`;
           updateMessage(aiMessageId, {
-            content: `❌ Error: ${error.message}\n\nPlease check your API settings and connection.`,
+            content: `❌ ${userMsg}\n\nPlease check your API settings and connection.`,
           }).catch((err) => {
             console.error("Failed to update error message:", err);
           });

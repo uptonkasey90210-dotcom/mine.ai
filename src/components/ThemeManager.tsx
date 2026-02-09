@@ -85,6 +85,9 @@ export function ThemeManager() {
     const root = document.documentElement;
     const colorHex = (accent?.value as string) || "#3b82f6";
 
+    /* REFACTOR: Set --accent-color for components that reference it directly
+       (e.g., ChatInput send button). Previously this was duplicated in page.tsx. */
+    root.style.setProperty("--accent-color", colorHex);
     root.style.setProperty("--primary-hex", colorHex);
     const hsl = hexToHSL(colorHex);
     if (hsl) {
@@ -92,6 +95,15 @@ export function ThemeManager() {
       root.style.setProperty("--ring", hsl);
     }
   }, [accent]);
+
+  /* REFACTOR: Font size application moved here from page.tsx to centralize
+     all DOM-mutating theme logic in one component, preventing race conditions. */
+  const fontSize = useLiveQuery(() => db.settings.where("key").equals("font_size_modifier").first());
+  useEffect(() => {
+    const size = (fontSize?.value as string) || "medium";
+    const sizeMap: Record<string, string> = { small: "14px", medium: "16px", large: "18px" };
+    document.documentElement.style.fontSize = sizeMap[size] || "16px";
+  }, [fontSize]);
 
   // 3. THEME PRESET (background colours)
   useEffect(() => {

@@ -5,6 +5,7 @@ import { ChatBubble } from "./ChatBubble";
 import { TypingIndicator } from "./TypingIndicator";
 import { WelcomeBanner } from "./WelcomeBanner";
 import { DateDivider } from "./DateDivider";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { db } from "@/lib/db";
 
 interface ChatAreaProps {
@@ -62,7 +63,11 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
           <div className="flex flex-col gap-1 pb-2">
             <AnimatePresence mode="popLayout">
               {messages?.map((msg) => (
-                <ChatBubble key={msg.id} message={msg} bubbleStyle={bubbleStyle} characterAvatar={characterAvatar} />
+                <ErrorBoundary key={msg.id} name="ChatBubble" fallback={
+                  <div className="px-4 py-2 text-xs text-zinc-500 italic">Failed to render message</div>
+                }>
+                  <ChatBubble message={msg} bubbleStyle={bubbleStyle} characterAvatar={characterAvatar} />
+                </ErrorBoundary>
               ))}
             </AnimatePresence>
             {isTyping && <TypingIndicator characterAvatar={characterAvatar} />}

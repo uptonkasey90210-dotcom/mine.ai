@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeManager } from "@/components/ThemeManager"; // <--- 1. IMPORT ADDED
+import { ThemeManager } from "@/components/ThemeManager";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,13 +39,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {/* 2. COMPONENT ADDED: This watches the DB and updates colors instantly */}
-        <ThemeManager /> 
-        {children}
+        <ThemeManager />
+        <ErrorBoundary name="App">
+          {children}
+        </ErrorBoundary>
       </body>
     </html>
   );
