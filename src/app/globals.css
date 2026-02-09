@@ -45,7 +45,7 @@
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   
@@ -67,4 +67,41 @@ body {
     --safe-area-bottom: env(safe-area-inset-bottom);
     --safe-area-left: env(safe-area-inset-left);
   }
+}
+
+/* ─── Theme Engine: Variables ───────────────────────────────────── */
+:root {
+  --mine-bg: #09090b;
+  --mine-surface: #18181b;
+  --mine-border: #27272a;
+}
+
+/* ─── Wallpaper Support ─────────────────────────────────────────── */
+body.has-wallpaper {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* ─── Glass Mode ────────────────────────────────────────────────── */
+html.glass-mode [data-glass-bg] {
+  background-color: transparent !important;
+}
+
+html.glass-mode [data-glass-modal] {
+  background-color: rgba(9, 9, 11, 0.55) !important;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.glass-mode [data-glass-surface] {
+  background-color: rgba(24, 24, 27, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Glass-mode readability: subtle text shadow on light text */
+html.glass-mode .text-zinc-100,
+html.glass-mode .text-zinc-200 {
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }

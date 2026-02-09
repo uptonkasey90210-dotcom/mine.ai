@@ -33,6 +33,10 @@ export function Sidebar({
     () => db.threads.orderBy("updatedAt").reverse().toArray(),
     []
   );
+  const userProfile = useLiveQuery(async () => {
+    const s = await db.settings.get("user_profile");
+    return s?.value;
+  });
 
   const handleNewChat = async () => {
     const thread = await createThread();
@@ -225,9 +229,9 @@ export function Sidebar({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[13px] font-medium text-zinc-100 truncate tracking-tight">
-                mine.ai User
+                {userProfile?.displayName || "mine.ai User"}
               </p>
-              <p className="text-[10px] text-zinc-500">Privacy First</p>
+              <p className="text-[10px] text-zinc-500">{userProfile?.role || "Privacy First"}</p>
             </div>
             <motion.button
               whileTap={{ scale: 0.95 }}

@@ -96,6 +96,9 @@ export const DEFAULT_SETTINGS = {
   user_email: "",
   subscription_tier: "Free Plan",
   app_language: "English",
+  wallpaper_url: "",
+  glass_mode: false,
+  theme_preset: "default",
 };
 
 // ─── Settings Helper Functions ───────────────────────────────────

@@ -11,6 +11,7 @@ import {
   deleteThread,
   getAllSettings,
   getSetting,
+  getFlexibleSetting,
   getCharacter,
   createCharacterThread,
   type Message,
@@ -202,6 +203,19 @@ export default function MineAIChat() {
       systemPrompt = settings.systemPrompt || "You are mine.ai, a private, local-first AI assistant.";
     }
 
+    // ═══ USER PROFILE INJECTION ═══
+    const userProfile = await getFlexibleSetting("user_profile", null);
+    if (userProfile && !currentCharacter) {
+      const profileParts: string[] = [];
+      if (userProfile.displayName) profileParts.push(`Name: ${userProfile.displayName}`);
+      if (userProfile.role) profileParts.push(`Role: ${userProfile.role}`);
+      if (userProfile.bio) profileParts.push(`Context: ${userProfile.bio}`);
+      if (userProfile.location) profileParts.push(`Location: ${userProfile.location}`);
+      if (profileParts.length > 0) {
+        systemPrompt += `\n\n[USER PROFILE]\n${profileParts.join('\n')}`;
+      }
+    }
+
     // Prepare message history
     const history = await db.messages
       .where("threadId")
@@ -370,9 +384,9 @@ export default function MineAIChat() {
   }, []);
 
   return (
-    <div className="relative flex h-dvh w-full overflow-hidden bg-zinc-950">
+    <div className="relative flex h-dvh w-full overflow-hidden bg-background" data-glass-bg>
       {/* iOS Safe Area Background Extension */}
-      <div className="fixed inset-0 bg-zinc-950 -z-10" />
+      <div className="fixed inset-0 bg-background -z-10" data-glass-bg />
 
       {/* Sidebar */}
       <Sidebar

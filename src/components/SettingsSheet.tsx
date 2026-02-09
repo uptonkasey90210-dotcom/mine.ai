@@ -35,12 +35,16 @@ import {
   EyeOff,
   Clock,
   Key,
+  User,
+  Image,
+  Layers,
 } from "lucide-react";
 import { db, getSetting, setSetting, getAllSettings, toggleArchiveThread, deleteThread, getFlexibleSetting, setFlexibleSetting, debugAllSettings } from "@/lib/db";
 import { fetchModels } from "@/lib/api";
+import { THEME_PRESETS } from "./ThemeManager";
 
 // ─── Types ───────────────────────────────────────────────────────
-type Screen = "root" | "security" | "data" | "about" | "ai" | "appearance" | "archived";
+type Screen = "root" | "security" | "data" | "about" | "ai" | "appearance" | "archived" | "identity";
 type ModelType = "default" | string;
 type BubbleStyle = "default" | "modern" | "compact";
 
@@ -54,10 +58,13 @@ const BUBBLE_STYLE_OPTIONS = [
 // ─── Accent Colors ───────────────────────────────────────────────
 const ACCENT_COLORS = [
   { name: "Blue", hex: "#3b82f6", class: "bg-blue-500" },
-  { name: "Green", hex: "#22c55e", class: "bg-green-500" },
-  { name: "Orange", hex: "#f97316", class: "bg-orange-500" },
-  { name: "Pink", hex: "#ec4899", class: "bg-pink-500" },
+  { name: "Violet", hex: "#8b5cf6", class: "bg-violet-500" },
   { name: "Purple", hex: "#a855f7", class: "bg-purple-500" },
+  { name: "Rose", hex: "#f43f5e", class: "bg-rose-500" },
+  { name: "Orange", hex: "#f97316", class: "bg-orange-500" },
+  { name: "Amber", hex: "#f59e0b", class: "bg-amber-500" },
+  { name: "Emerald", hex: "#10b981", class: "bg-emerald-500" },
+  { name: "Cyan", hex: "#06b6d4", class: "bg-cyan-500" },
 ];
 
 // ─── Export User Data ────────────────────────────────────────────
@@ -836,18 +843,163 @@ function ArchivedScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+function IdentityScreen({ onBack }: { onBack: () => void }) {
+  const [displayName, setDisplayName] = useState("");
+  const [role, setRole] = useState("");
+  const [bio, setBio] = useState("");
+  const [location, setLocation] = useState("");
+  const [isSaved, setIsSaved] = useState(false);
+
+  // Load existing profile from DB
+  useEffect(() => {
+    const load = async () => {
+      const profile = await getFlexibleSetting("user_profile", {});
+      setDisplayName(profile.displayName || "");
+      setRole(profile.role || "");
+      setBio(profile.bio || "");
+      setLocation(profile.location || "");
+    };
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    await setFlexibleSetting("user_profile", {
+      displayName,
+      role,
+      bio,
+      location,
+    });
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <SubHeader
+        title="User Identity"
+        onBack={onBack}
+        rightAction={
+          <button
+            type="button"
+            onClick={handleSave}
+            className={`flex h-10 items-center justify-center rounded-full border px-4 text-[15px] transition-all ${
+              isSaved
+                ? "border-green-600 text-green-400 bg-green-600/10"
+                : "border-zinc-700 text-zinc-300 active:bg-zinc-800"
+            }`}
+          >
+            {isSaved ? "Saved ✓" : "Save"}
+          </button>
+        }
+      />
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
+        <Section
+          title="Profile"
+          footer="This information is appended to the AI's system prompt for personalised responses."
+        >
+          <div className="px-4 py-3 border-b border-zinc-800/60">
+            <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
+              Display Name
+            </label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Your name"
+              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+          <div className="px-4 py-3 border-b border-zinc-800/60">
+            <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
+              Role / Title
+            </label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="e.g. Software Engineer"
+              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+          <div className="px-4 py-3 border-b border-zinc-800/60">
+            <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
+              Bio / Context
+            </label>
+            <textarea
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="e.g. I prefer concise answers. I use Python and TypeScript."
+              rows={3}
+              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600 resize-none leading-relaxed"
+            />
+          </div>
+          <div className="px-4 py-3">
+            <label className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5 block">
+              Location (Optional)
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. San Francisco, CA"
+              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+        </Section>
+
+        <Section title="How It Works">
+          <div className="px-4 py-3">
+            <p className="text-[14px] text-zinc-400 leading-relaxed">
+              Your profile is injected into the AI system prompt as a{" "}
+              <span className="text-zinc-300 font-medium">[USER PROFILE]</span>{" "}
+              block, giving the model context about you without sharing raw
+              data externally.
+            </p>
+          </div>
+        </Section>
+      </div>
+    </div>
+  );
+}
+
 function AppearanceScreen({ onBack }: { onBack: () => void }) {
   const accentColor = useLiveQuery(() => getSetting("accent_color"));
   const appearance = useLiveQuery(() => getSetting("appearance"));
   const textSize = useLiveQuery(() => getSetting("font_size_modifier"));
   const bubbleStyle = useLiveQuery(() => getSetting("bubble_style"));
+  const wallpaperUrl = useLiveQuery(() => getFlexibleSetting("wallpaper_url", ""));
+  const glassMode = useLiveQuery(() => getFlexibleSetting("glass_mode", false));
+  const themePreset = useLiveQuery(() => getFlexibleSetting("theme_preset", "default"));
+
+  const [localWallpaper, setLocalWallpaper] = useState("");
+
+  useEffect(() => {
+    if (wallpaperUrl !== undefined) setLocalWallpaper(wallpaperUrl || "");
+  }, [wallpaperUrl]);
 
   const handleColorSelect = async (hex: string) => {
     await setSetting("accent_color", hex);
-    // Apply to multiple CSS variables for better theme support
     document.documentElement.style.setProperty("--accent-color", hex);
     document.documentElement.style.setProperty("--primary", hex);
     document.documentElement.style.setProperty("--ring", hex);
+  };
+
+  const handlePresetSelect = async (preset: (typeof THEME_PRESETS)[number]) => {
+    await setFlexibleSetting("theme_preset", preset.id);
+    await setSetting("accent_color", preset.accent);
+  };
+
+  const handleWallpaperApply = async () => {
+    await setFlexibleSetting("wallpaper_url", localWallpaper.trim());
+  };
+
+  const handleWallpaperClear = async () => {
+    setLocalWallpaper("");
+    await setFlexibleSetting("wallpaper_url", "");
+  };
+
+  const handleGlassToggle = async (value: boolean) => {
+    await setFlexibleSetting("glass_mode", value);
   };
 
   const handleBubbleStyleChange = async (style: "default" | "modern" | "compact") => {
@@ -856,7 +1008,6 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 
   const handleAppearanceChange = async (value: string) => {
     await setSetting("appearance", value);
-    // Sync with theme_mode key that ThemeManager watches
     const modeMap: Record<string, "dark" | "light" | "system"> = {
       Dark: "dark",
       Light: "light",
@@ -867,7 +1018,6 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 
   const handleTextSizeChange = async (size: "small" | "medium" | "large") => {
     await setSetting("font_size_modifier", size);
-    // Apply text size to document root
     const sizeMap = { small: "14px", medium: "16px", large: "18px" };
     document.documentElement.style.fontSize = sizeMap[size] || "16px";
   };
@@ -884,6 +1034,7 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     <div className="flex h-full flex-col">
       <SubHeader title="Appearance" onBack={onBack} />
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
+        {/* ── Theme Mode ───────────────────────── */}
         <Section title="Theme">
           <div className="px-4 py-3">
             <select
@@ -898,29 +1049,69 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section
-          title="Accent Color"
-          footer="Choose your preferred accent color for buttons and highlights."
-        >
-          <div className="px-4 py-6">
-            <div className="flex items-center justify-center gap-6">
+        {/* ── Theme Presets ─────────────────────── */}
+        <Section title="Presets" footer="Pick a colour scheme. This also sets the accent colour.">
+          <div className="px-4 py-4">
+            <div className="grid grid-cols-4 gap-3">
+              {THEME_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handlePresetSelect(preset)}
+                  className={`relative flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+                    themePreset === preset.id
+                      ? "ring-2 ring-blue-500 bg-zinc-800/60"
+                      : "hover:bg-zinc-800/30"
+                  }`}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg border border-white/10 overflow-hidden"
+                    style={{
+                      background: `linear-gradient(135deg, ${preset.surface}, ${preset.bg})`,
+                    }}
+                  >
+                    <div
+                      className="w-3 h-3 rounded-full mt-1.5 ml-1.5"
+                      style={{ backgroundColor: preset.accent }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-zinc-400 leading-tight text-center">
+                    {preset.name}
+                  </span>
+                  {themePreset === preset.id && (
+                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Accent Color ─────────────────────── */}
+        <Section title="Accent Color" footer="Choose your preferred accent color for buttons and highlights.">
+          <div className="px-4 py-5">
+            <div className="grid grid-cols-4 gap-x-6 gap-y-4 justify-items-center">
               {ACCENT_COLORS.map((color) => (
                 <button
                   key={color.hex}
                   type="button"
                   onClick={() => handleColorSelect(color.hex)}
-                  className="relative flex flex-col items-center gap-2 group"
+                  className="relative flex flex-col items-center gap-1.5 group"
                 >
                   <div
-                    className={`w-14 h-14 rounded-full ${color.class} flex items-center justify-center transition-all group-hover:scale-110 ${
-                      accentColor === color.hex ? "ring-2 ring-zinc-100 ring-offset-2 ring-offset-zinc-950" : ""
+                    className={`w-12 h-12 rounded-full ${color.class} flex items-center justify-center transition-all group-hover:scale-110 ${
+                      accentColor === color.hex
+                        ? "ring-2 ring-zinc-100 ring-offset-2 ring-offset-zinc-950"
+                        : ""
                     }`}
                   >
                     {accentColor === color.hex && (
-                      <Check className="h-6 w-6 text-white" strokeWidth={3} />
+                      <Check className="h-5 w-5 text-white" strokeWidth={3} />
                     )}
                   </div>
-                  <span className="text-[11px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
+                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
                     {color.name}
                   </span>
                 </button>
@@ -929,11 +1120,68 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
+        {/* ── Wallpaper ────────────────────────── */}
+        <Section title="Wallpaper" footer="Paste a URL to an image. Works best with Glass Mode enabled.">
+          <div className="px-4 py-3 border-b border-zinc-800/60">
+            <input
+              type="url"
+              value={localWallpaper}
+              onChange={(e) => setLocalWallpaper(e.target.value)}
+              placeholder="https://example.com/wallpaper.jpg"
+              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+          <div className="px-4 py-3 flex gap-2">
+            <button
+              type="button"
+              onClick={handleWallpaperApply}
+              disabled={!localWallpaper.trim()}
+              className="flex-1 rounded-lg px-4 py-2 text-[13px] font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={handleWallpaperClear}
+              disabled={!wallpaperUrl}
+              className="rounded-lg px-4 py-2 text-[13px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Clear
+            </button>
+          </div>
+          {wallpaperUrl && (
+            <div className="px-4 pb-3">
+              <div
+                className="w-full h-24 rounded-lg bg-cover bg-center border border-zinc-700/50"
+                style={{ backgroundImage: `url(${wallpaperUrl})` }}
+              />
+            </div>
+          )}
+        </Section>
+
+        {/* ── Glass Mode ───────────────────────── */}
+        <Section
+          title="Effects"
+          footer="Glassmorphism makes surfaces semi-transparent with a blur. Best paired with a wallpaper."
+        >
+          <Row
+            icon={<Layers className="h-5 w-5" />}
+            label="Glass Mode (Blur)"
+            toggle
+            toggleValue={glassMode ?? false}
+            onToggle={handleGlassToggle}
+            isLast
+          />
+        </Section>
+
+        {/* ── Text Size ────────────────────────── */}
         <Section title="Text Size">
           <div className="px-4 py-3">
             <select
               value={textSize || "medium"}
-              onChange={(e) => handleTextSizeChange(e.target.value as "small" | "medium" | "large")}
+              onChange={(e) =>
+                handleTextSizeChange(e.target.value as "small" | "medium" | "large")
+              }
               className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
             >
               <option value="small">Small</option>
@@ -943,11 +1191,14 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
+        {/* ── Bubble Style ─────────────────────── */}
         <Section title="Message Bubble Style" footer="Choose how your chat messages appear">
           <div className="px-4 py-3">
             <select
               value={bubbleStyle || "default"}
-              onChange={(e) => handleBubbleStyleChange(e.target.value as "default" | "modern" | "compact")}
+              onChange={(e) =>
+                handleBubbleStyleChange(e.target.value as "default" | "modern" | "compact")
+              }
               className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
             >
               {BUBBLE_STYLE_OPTIONS.map((style) => (
@@ -983,7 +1234,6 @@ export function SettingsSheet({
   const notificationsEnabled = useLiveQuery(() => getSetting("notifications_enabled"));
   const accentColor = useLiveQuery(() => getSetting("accent_color"));
   const apiUrl = useLiveQuery(() => getSetting("apiUrl"));
-  const userEmail = useLiveQuery(() => getSetting("user_email"));
   const subscriptionTier = useLiveQuery(() => getSetting("subscription_tier"));
   const appLanguage = useLiveQuery(() => getSetting("app_language"));
 
@@ -1018,13 +1268,6 @@ export function SettingsSheet({
 
   const handleNotificationsToggle = async (value: boolean) => {
     await setSetting("notifications_enabled", value);
-  };
-
-  const handleEmailClick = async () => {
-    const email = prompt("Enter your email:", userEmail || "");
-    if (email !== null) {
-      await setSetting("user_email", email);
-    }
   };
 
   const handleSubscriptionClick = () => {
@@ -1063,13 +1306,14 @@ export function SettingsSheet({
       />
 
       {/* modal container */}
-      <div className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-zinc-950 sm:h-[85vh] sm:rounded-3xl">
+      <div className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-zinc-950 sm:h-[85vh] sm:rounded-3xl" data-glass-modal>
         {screen === "ai" && <AISettingsScreen onBack={() => setScreen("root")} />}
         {screen === "security" && <SecurityScreen onBack={() => setScreen("root")} />}
         {screen === "data" && <DataScreen onBack={() => setScreen("root")} />}
         {screen === "about" && <AboutScreen onBack={() => setScreen("root")} />}
         {screen === "archived" && <ArchivedScreen onBack={() => setScreen("root")} />}
         {screen === "appearance" && <AppearanceScreen onBack={() => setScreen("root")} />}
+        {screen === "identity" && <IdentityScreen onBack={() => setScreen("root")} />}
 
         {screen === "root" && (
           <>
@@ -1147,11 +1391,10 @@ export function SettingsSheet({
 
               {/* ── Account ─────────────────────────── */}
               <Section title="Account">
-                <Row 
-                  icon={<Mail className="h-5 w-5" />} 
-                  label="Email" 
-                  value={userEmail || "Not set"}
-                  onClick={handleEmailClick} 
+                <Row
+                  icon={<User className="h-5 w-5" />}
+                  label="User Identity"
+                  onClick={() => setScreen("identity")}
                 />
                 <Row
                   icon={<PlusSquare className="h-5 w-5" />}
