@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion, useMotionValue, useTransform, useAnimation, type PanInfo } from "framer-motion";
 import { MessageSquare, Archive, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,8 @@ import type { Thread } from "@/lib/db";
 interface ThreadItemProps {
   thread: Thread;
   isActive: boolean;
+  openSwipeId: string | null;
+  onSwipeOpen: (threadId: string) => void;
   onClick: () => void;
   onArchive?: (threadId: string) => void;
   onDelete?: (threadId: string) => void;
@@ -24,24 +26,32 @@ function formatThreadDate(date: Date): string {
 const SWIPE_THRESHOLD = -80;
 const ACTION_BUTTON_WIDTH = 140;
 
-export function ThreadItem({ thread, isActive, onClick, onArchive, onDelete }: ThreadItemProps) {
+export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onClick, onArchive, onDelete }: ThreadItemProps) {
   const x = useMotionValue(0);
   const controls = useAnimation();
-  const [swiped, setSwiped] = useState(false);
+  const isOpen = openSwipeId === thread.id;
+  const prevOpenRef = useRef(isOpen);
+
+  // Auto-close when another item is swiped open (exclusive-open logic)
+  useEffect(() => {
+    if (prevOpenRef.current && !isOpen) {
+      // This item was open but openSwipeId changed to another item — close it
+      controls.start({ x: 0 });
+    }
+    prevOpenRef.current = isOpen;
+  }, [isOpen, controls]);
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     if (info.offset.x < SWIPE_THRESHOLD) {
       controls.start({ x: -ACTION_BUTTON_WIDTH });
-      setSwiped(true);
+      onSwipeOpen(thread.id); // Notify parent — closes all others
     } else {
       controls.start({ x: 0 });
-      setSwiped(false);
     }
   };
 
   const closeSwipe = () => {
     controls.start({ x: 0 });
-    setSwiped(false);
   };
 
   return (
@@ -74,9 +84,9 @@ export function ThreadItem({ thread, isActive, onClick, onArchive, onDelete }: T
         dragConstraints={{ left: -ACTION_BUTTON_WIDTH, right: 0 }}
         dragElastic={0.1}
         onDragEnd={handleDragEnd}
-        whileTap={!swiped ? { scale: 0.97 } : undefined}
+        whileTap={!isOpen ? { scale: 0.97 } : undefined}
         type="button"
-        onClick={() => { if (swiped) { closeSwipe(); } else { onClick(); } }}
+        onClick={(e) => { if (isOpen) { e.stopPropagation(); closeSwipe(); } else { onClick(); } }}
         className={cn(
           "w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors relative z-10 bg-zinc-950",
           isActive

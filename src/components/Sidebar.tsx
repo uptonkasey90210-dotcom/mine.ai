@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { db, createThread, deleteThread, updateThreadTitle, toggleArchiveThread, type Character } from "@/lib/db";
 import { ThreadItem } from "./ThreadItem";
 import { CharacterSidebarTab } from "./Character/CharacterSidebarTab";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -31,6 +31,16 @@ export function Sidebar({
   onOpenIdentity,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("chats");
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null);
+
+  const handleSwipeOpen = useCallback((threadId: string) => {
+    setOpenSwipeId(threadId);
+  }, []);
+
+  const handleCloseAllSwipes = useCallback(() => {
+    setOpenSwipeId(null);
+  }, []);
+
   const threads = useLiveQuery(
     () => db.threads.orderBy("updatedAt").reverse().toArray(),
     []
@@ -188,6 +198,9 @@ export function Sidebar({
         <div className="flex-1 overflow-hidden">
           {activeTab === "chats" ? (
             <div className="h-full overflow-y-auto px-2 pb-2">
+              {/* Click-outside listener: tapping the list background closes any open swipe */}
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+              <div onClick={handleCloseAllSwipes}>
               <div className="px-2 py-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
                   Recent — Swipe left for options
@@ -199,7 +212,10 @@ export function Sidebar({
                     key={thread.id}
                     thread={thread}
                     isActive={thread.id === activeThreadId}
+                    openSwipeId={openSwipeId}
+                    onSwipeOpen={handleSwipeOpen}
                     onClick={() => {
+                      handleCloseAllSwipes();
                       onSelectThread(thread.id);
                       onClose();
                     }}
@@ -207,6 +223,7 @@ export function Sidebar({
                     onDelete={(id) => handleDeleteThread(id)}
                   />
                 ))}
+              </div>
               </div>
             </div>
           ) : (

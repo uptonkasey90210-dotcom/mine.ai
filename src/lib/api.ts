@@ -1,4 +1,4 @@
-import { getSetting } from "./db";
+import { getSetting, db } from "./db";
 import { resilientFetch, NetworkError, isDeviceOffline } from "./network";
 
 // Type definitions for API responses
@@ -96,6 +96,29 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
 
     // Construct absolute URL — defaults to OpenAI-compatible /v1/chat/completions
     const targetUrl = buildChatCompletionUrl(apiUrl);
+
+    // ═══ IDENTITY INJECTION (Service-Level) ═══
+    // Force-read user profile from Dexie and prepend identity context
+    // to the system prompt so the AI always knows who it's talking to.
+    let resolvedSystemPrompt = systemPrompt;
+    try {
+      const profileSetting = await db.settings.get("user_profile");
+      const userProfile = profileSetting?.value;
+      if (userProfile) {
+        const identityParts: string[] = [];
+        if (userProfile.displayName) identityParts.push(`Name=${userProfile.displayName}`);
+        if (userProfile.role) identityParts.push(`Role=${userProfile.role}`);
+        if (userProfile.bio) identityParts.push(`Bio=${userProfile.bio}`);
+        if (userProfile.location) identityParts.push(`Location=${userProfile.location}`);
+        if (identityParts.length > 0) {
+          const identityContext = `[User Info: ${identityParts.join(", ")}.]`;
+          resolvedSystemPrompt = `${identityContext}\n\n${resolvedSystemPrompt}`;
+        }
+      }
+    } catch (e) {
+      // Silently proceed — identity is best-effort, never block the request
+      console.warn("[api] Failed to read user profile for injection:", e);
+    }
     
     /* REFACTOR: Use resilientFetch with 3s timeout for LAN, 10s for remote.
        Streaming requests use a longer initial timeout since the first token
@@ -109,7 +132,7 @@ export async function streamAIResponse(options: StreamOptions): Promise<void> {
       body: JSON.stringify({
         model: modelName,
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: resolvedSystemPrompt },
           ...messages,
         ],
         temperature,
