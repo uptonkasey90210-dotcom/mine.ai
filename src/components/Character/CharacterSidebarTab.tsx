@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useAnimation, type PanInfo } from "framer-motion";
 import { Plus, User, MessageSquare, Pencil, Trash2, MoreVertical } from "lucide-react";
 import { db, getAllCharacters, deleteCharacter, type Character } from "@/lib/db";
 import { CharacterWizard } from "./CharacterWizard";
@@ -112,6 +112,9 @@ interface CharacterCardProps {
 
 function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: CharacterCardProps) {
   const [showMenu, setShowMenu] = useState(false);
+  const [swiped, setSwiped] = useState(false);
+  const x = useMotionValue(0);
+  const controls = useAnimation();
   const threadCount = useLiveQuery(
     async () => {
       if (!character.id) return 0;
@@ -121,17 +124,59 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
     0
   );
 
+  const SWIPE_THRESHOLD = -60;
+  const ACTION_WIDTH = 70;
+
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    if (info.offset.x < SWIPE_THRESHOLD) {
+      controls.start({ x: -ACTION_WIDTH });
+      setSwiped(true);
+    } else {
+      controls.start({ x: 0 });
+      setSwiped(false);
+    }
+  };
+
+  const closeSwipe = () => {
+    controls.start({ x: 0 });
+    setSwiped(false);
+  };
+
   return (
-    <div className="relative group">
+    <div className="relative overflow-hidden rounded-lg">
+      {/* Delete button revealed behind */}
+      <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
+        <button
+          type="button"
+          onClick={async () => {
+            closeSwipe();
+            if (character.id && confirm(`Delete ${character.name}? This will also delete all associated chats.`)) {
+              await deleteCharacter(character.id);
+            }
+          }}
+          className="flex items-center justify-center w-[70px] bg-red-600 text-white text-[11px] font-medium gap-1 flex-col"
+        >
+          <Trash2 size={16} />
+          Delete
+        </button>
+      </div>
+
+      {/* Swipeable foreground */}
       <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        onClick={onClick}
+        style={{ x }}
+        animate={controls}
+        drag="x"
+        dragConstraints={{ left: -ACTION_WIDTH, right: 0 }}
+        dragElastic={0.1}
+        onDragEnd={handleDragEnd}
+        whileHover={!swiped ? { scale: 1.02 } : undefined}
+        whileTap={!swiped ? { scale: 0.98 } : undefined}
+        onClick={() => { if (swiped) { closeSwipe(); } else { onClick(); } }}
         onContextMenu={(e) => {
           e.preventDefault();
           setShowMenu(!showMenu);
         }}
-        className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+        className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left relative z-10 ${
           isActive
             ? "bg-blue-600/20 border border-blue-600/50"
             : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
@@ -172,34 +217,6 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
           </div>
         )}
       </motion.button>
-
-      {/* Hover action buttons */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEdit();
-          }}
-          className="p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-700 text-zinc-400 hover:text-blue-400 hover:border-blue-500/50 transition-all"
-          aria-label="Edit character"
-        >
-          <Pencil size={13} />
-        </motion.button>
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowMenu(!showMenu);
-          }}
-          className="p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-all"
-          aria-label="More options"
-        >
-          <MoreVertical size={13} />
-        </motion.button>
-      </div>
 
       {/* Context Menu */}
       {showMenu && (

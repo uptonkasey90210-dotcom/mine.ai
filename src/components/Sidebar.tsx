@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import { X, Sparkles, Plus, Settings, User, Trash2, Pencil, MessageSquare, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { db, createThread, deleteThread, updateThreadTitle, type Character } from "@/lib/db";
+import { db, createThread, deleteThread, updateThreadTitle, toggleArchiveThread, type Character } from "@/lib/db";
 import { ThreadItem } from "./ThreadItem";
 import { CharacterSidebarTab } from "./Character/CharacterSidebarTab";
 import { useState } from "react";
@@ -15,6 +15,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onSelectCharacter?: (character: Character) => void;
   activeCharacterId?: number | null;
+  onOpenIdentity?: () => void;
 }
 
 type SidebarTab = "chats" | "characters";
@@ -27,6 +28,7 @@ export function Sidebar({
   onOpenSettings,
   onSelectCharacter,
   activeCharacterId,
+  onOpenIdentity,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("chats");
   const threads = useLiveQuery(
@@ -44,20 +46,34 @@ export function Sidebar({
     onClose();
   };
 
-  const handleDeleteThread = async (threadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleDeleteThread = async (threadId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (confirm("Delete this conversation?")) {
       await deleteThread(threadId);
       if (activeThreadId === threadId) {
-        // Switch to first available thread
         const remaining = await db.threads.orderBy("updatedAt").reverse().first();
         if (remaining) {
           onSelectThread(remaining.id);
         } else {
-          // Create a new thread if none exist
           const newThread = await createThread();
           onSelectThread(newThread.id);
         }
+      }
+    }
+  };
+
+  const handleArchiveThread = async (threadId: string) => {
+    await toggleArchiveThread(threadId);
+    if (activeThreadId === threadId) {
+      const remaining = await db.threads
+        .filter(t => !t.archived && t.id !== threadId)
+        .reverse()
+        .sortBy("updatedAt");
+      if (remaining.length > 0) {
+        onSelectThread(remaining[0].id);
+      } else {
+        const newThread = await createThread();
+        onSelectThread(newThread.id);
       }
     }
   };
@@ -94,7 +110,7 @@ export function Sidebar({
       <aside
         className={cn(
           "fixed top-0 left-0 bottom-0 w-[280px] z-50 flex flex-col",
-          "bg-black/60 backdrop-blur-xl border-r border-zinc-800/50",
+          "bg-black/60 backdrop-blur-xl border-r border-zinc-800/50 [html.glass-mode_&]:bg-transparent",
           "transition-transform duration-300 ease-in-out",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
@@ -174,39 +190,22 @@ export function Sidebar({
             <div className="h-full overflow-y-auto px-2 pb-2">
               <div className="px-2 py-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-                  Recent
+                  Recent — Swipe left for options
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
-                {threads?.map((thread) => (
-                  <div key={thread.id} className="relative group">
-                    <ThreadItem
-                      thread={thread}
-                      isActive={thread.id === activeThreadId}
-                      onClick={() => {
-                        onSelectThread(thread.id);
-                        onClose();
-                      }}
-                    />
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      type="button"
-                      onClick={(e) => handleRenameThread(thread.id, thread.title, e)}
-                      className="absolute right-10 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-blue-400 hover:border-blue-500/50 opacity-0 group-hover:opacity-100 transition-all"
-                      aria-label="Rename thread"
-                    >
-                      <Pencil size={13} />
-                    </motion.button>
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
-                      type="button"
-                      onClick={(e) => handleDeleteThread(thread.id, e)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800 text-zinc-500 hover:text-red-400 hover:border-red-500/50 opacity-0 group-hover:opacity-100 transition-all"
-                      aria-label="Delete thread"
-                    >
-                      <Trash2 size={13} />
-                    </motion.button>
-                  </div>
+                {threads?.filter(t => !t.archived).map((thread) => (
+                  <ThreadItem
+                    key={thread.id}
+                    thread={thread}
+                    isActive={thread.id === activeThreadId}
+                    onClick={() => {
+                      onSelectThread(thread.id);
+                      onClose();
+                    }}
+                    onArchive={handleArchiveThread}
+                    onDelete={(id) => handleDeleteThread(id)}
+                  />
                 ))}
               </div>
             </div>
@@ -224,15 +223,21 @@ export function Sidebar({
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-zinc-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
-              <User size={13} className="text-zinc-100" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-zinc-100 truncate tracking-tight">
-                {userProfile?.displayName || "mine.ai User"}
-              </p>
-              <p className="text-[10px] text-zinc-500">{userProfile?.role || "Privacy First"}</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => { onOpenIdentity?.(); onClose(); }}
+              className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">
+                <User size={13} className="text-zinc-100" />
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-[13px] font-medium text-zinc-100 truncate tracking-tight">
+                  {userProfile?.displayName || "mine.ai User"}
+                </p>
+                <p className="text-[10px] text-zinc-500">{userProfile?.role || "Privacy First"}</p>
+              </div>
+            </button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               type="button"

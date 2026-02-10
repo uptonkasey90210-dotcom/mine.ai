@@ -1,4 +1,4 @@
-import { useRef, useEffect, useLayoutEffect } from "react";
+import { useRef, useEffect, useLayoutEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ChatBubble } from "./ChatBubble";
@@ -53,6 +53,31 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
   // Scroll to bottom when messages change
   const shouldShowWelcome = !messages || messages.length === 0;
 
+  // ═══ Ghost Loading Box Fix ═══
+  // Only show the TypingIndicator bouncing dots when the AI hasn't started
+  // streaming content yet. Once the AI message has content, the ChatBubble
+  // itself renders the streaming text, so the TypingIndicator would be a
+  // ghost duplicate. Also, delay hiding briefly after stream ends to prevent
+  // premature flicker.
+  const [showIndicator, setShowIndicator] = useState(false);
+  
+  const lastMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+  const lastAiMessageHasContent = lastMessage?.role === "ai" && lastMessage.content.length > 0;
+
+  useEffect(() => {
+    if (isTyping && !lastAiMessageHasContent) {
+      // Show indicator: AI is typing but no content has arrived yet
+      setShowIndicator(true);
+    } else if (!isTyping && showIndicator) {
+      // Stream finished — delay hiding to prevent flicker
+      const timer = setTimeout(() => setShowIndicator(false), 150);
+      return () => clearTimeout(timer);
+    } else if (lastAiMessageHasContent) {
+      // Content has started streaming — hide indicator immediately
+      setShowIndicator(false);
+    }
+  }, [isTyping, lastAiMessageHasContent, showIndicator]);
+
   return (
     <div className="flex-1 overflow-y-auto overscroll-contain pt-[calc(60px+env(safe-area-inset-top))] pb-[calc(110px+env(safe-area-inset-bottom))]">
       {shouldShowWelcome ? (
@@ -70,7 +95,7 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
                 </ErrorBoundary>
               ))}
             </AnimatePresence>
-            {isTyping && <TypingIndicator characterAvatar={characterAvatar} />}
+            {showIndicator && <TypingIndicator characterAvatar={characterAvatar} />}
           </div>
         </>
       )}

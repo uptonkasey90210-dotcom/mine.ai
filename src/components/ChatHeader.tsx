@@ -45,7 +45,7 @@ export function ChatHeader({
   };
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-black/60 backdrop-blur-xl border-b border-zinc-800/40">
+    <header className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))] bg-black/60 backdrop-blur-xl border-b border-zinc-800/40" data-glass-surface>
       <div className="flex items-center gap-3">
         <motion.button
           whileTap={{ scale: 0.95 }}

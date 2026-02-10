@@ -33,6 +33,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 export default function MineAIChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsDefaultScreen, setSettingsDefaultScreen] = useState<string | undefined>(undefined);
   const [characterProfileOpen, setCharacterProfileOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -224,15 +225,17 @@ export default function MineAIChat() {
     }
 
     // ═══ USER PROFILE INJECTION ═══
+    // Inject user identity into the system prompt for ALL chats (character and default)
+    // This gives the AI context about who it's talking to.
     const userProfile = await getFlexibleSetting("user_profile", null);
-    if (userProfile && !currentCharacter) {
+    if (userProfile) {
       const profileParts: string[] = [];
       if (userProfile.displayName) profileParts.push(`Name: ${userProfile.displayName}`);
       if (userProfile.role) profileParts.push(`Role: ${userProfile.role}`);
       if (userProfile.bio) profileParts.push(`Context: ${userProfile.bio}`);
       if (userProfile.location) profileParts.push(`Location: ${userProfile.location}`);
       if (profileParts.length > 0) {
-        systemPrompt += `\n\n[USER PROFILE]\n${profileParts.join('\n')}`;
+        systemPrompt += `\n\n[USER PROFILE]\nYou are speaking with the following user:\n${profileParts.join('\n')}`;
       }
     }
 
@@ -444,13 +447,14 @@ export default function MineAIChat() {
         onClose={() => setSidebarOpen(false)}
         activeThreadId={activeThreadId}
         onSelectThread={setActiveThreadId}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => { setSettingsDefaultScreen(undefined); setSettingsOpen(true); }}
         onSelectCharacter={handleSelectCharacter}
         activeCharacterId={activeCharacterId}
+        onOpenIdentity={() => { setSettingsDefaultScreen("identity"); setSettingsOpen(true); }}
       />
 
       {/* Settings Bottom Sheet */}
-      <SettingsSheet isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsSheet isOpen={settingsOpen} onClose={() => { setSettingsOpen(false); setSettingsDefaultScreen(undefined); }} defaultScreen={settingsDefaultScreen as any} />
 
       {/* Character Profile Sheet */}
       <CharacterProfileSheet

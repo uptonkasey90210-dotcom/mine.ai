@@ -65,8 +65,16 @@ export function ThemeManager() {
 
     if (effectiveMode === "dark") {
       root.classList.add("dark");
+      root.classList.remove("light");
     } else {
       root.classList.remove("dark");
+      root.classList.add("light");
+      // Reset theme preset colors for light mode
+      root.style.setProperty("--mine-bg", "#f8f9fa");
+      root.style.setProperty("--mine-surface", "#ffffff");
+      root.style.setProperty("--mine-border", "#e5e7eb");
+      root.style.setProperty("--background", "#ffffff");
+      document.body.style.backgroundColor = "#ffffff";
     }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -105,11 +113,14 @@ export function ThemeManager() {
     document.documentElement.style.fontSize = sizeMap[size] || "16px";
   }, [fontSize]);
 
-  // 3. THEME PRESET (background colours)
+  // 3. THEME PRESET (background colours — only in dark mode)
   useEffect(() => {
+    const root = document.documentElement;
+    const isDark = root.classList.contains("dark");
+    if (!isDark) return; // Don't apply dark presets in light mode
+
     const presetId = (themePreset?.value as string) || "default";
     const preset = THEME_PRESETS.find(p => p.id === presetId) || THEME_PRESETS[0];
-    const root = document.documentElement;
 
     root.style.setProperty("--mine-bg", preset.bg);
     root.style.setProperty("--mine-surface", preset.surface);
@@ -118,7 +129,7 @@ export function ThemeManager() {
     // Update --background so Tailwind's bg-background tracks the preset
     root.style.setProperty("--background", preset.bg);
     document.body.style.backgroundColor = preset.bg;
-  }, [themePreset]);
+  }, [themePreset, theme]);
 
   // 4. WALLPAPER
   useEffect(() => {

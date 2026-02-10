@@ -486,13 +486,16 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        <Section title="Features">
+        <Section title="Features" footer="When enabled, shows the AI's reasoning process before each response.">
           <Row
             icon={<Brain className="h-5 w-5" />}
             label="Show thinking process"
             toggle
             toggleValue={localThinking}
-            onToggle={setLocalThinking}
+            onToggle={(v) => {
+              setLocalThinking(v);
+              setSetting("thinkingEnabled", v);
+            }}
             isLast
           />
         </Section>
@@ -507,9 +510,63 @@ function SecurityScreen({ onBack }: { onBack: () => void }) {
   const autoLockTimeout = useLiveQuery(() => getSetting("auto_lock_timeout"));
 
   const handleBiometricToggle = async (value: boolean) => {
-    await setSetting("security_biometric", value);
     if (value) {
-      alert("🔐 Biometric authentication enabled.\n\nNote: This is a UI demo. In a production app, this would integrate with device biometrics (FaceID/TouchID).");
+      // Attempt actual biometric enrollment
+      try {
+        const { NativeBiometric } = await import("capacitor-native-biometric");
+        
+        // Check if biometrics are available on this device
+        const result = await NativeBiometric.isAvailable();
+        
+        if (result.isAvailable) {
+          // Trigger biometric authentication challenge
+          await NativeBiometric.verifyIdentity({
+            reason: "Authenticate to enable biometric lock for mine.ai",
+            title: "Enable Biometric Lock",
+            subtitle: "Verify your identity",
+            description: "Use Face ID or Touch ID to secure mine.ai",
+          });
+          
+          // If we get here, authentication succeeded
+          await setSetting("security_biometric", true);
+        } else {
+          alert("Biometric authentication is not available on this device. Please set up Face ID or Touch ID in your device settings.");
+        }
+      } catch (err: any) {
+        // Check if Capacitor plugin is not available (web environment)
+        if (err?.message?.includes?.("not implemented") || err?.code === "UNIMPLEMENTED" || err?.name === "TypeError") {
+          // Web fallback — no native biometrics available
+          const supportsWebAuthn = typeof window !== "undefined" && window.PublicKeyCredential;
+          if (supportsWebAuthn) {
+            alert("🔐 Biometric lock requires a native app build (iOS/Android).\n\nWeb Authentication (WebAuthn) is available but biometric lock works best in the native app.");
+          } else {
+            alert("🔐 Biometric authentication is not available in the browser.\n\nPlease use the native iOS or Android app for biometric lock support.");
+          }
+        } else if (err?.code === "AUTH_FAILED" || err?.message?.includes?.("cancel")) {
+          // User cancelled or authentication failed
+          console.log("Biometric enrollment cancelled by user");
+        } else {
+          console.error("Biometric error:", err);
+          alert("Biometric authentication failed. Please try again.");
+        }
+      }
+    } else {
+      // Disabling biometrics — verify identity first
+      try {
+        const { NativeBiometric } = await import("capacitor-native-biometric");
+        const result = await NativeBiometric.isAvailable();
+        
+        if (result.isAvailable) {
+          await NativeBiometric.verifyIdentity({
+            reason: "Authenticate to disable biometric lock",
+            title: "Disable Biometric Lock",
+          });
+        }
+        await setSetting("security_biometric", false);
+      } catch {
+        // If plugin not available (web), just disable
+        await setSetting("security_biometric", false);
+      }
     }
   };
 
@@ -972,6 +1029,7 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
   const themePreset = useLiveQuery(() => getFlexibleSetting("theme_preset", "default"));
 
   const [localWallpaper, setLocalWallpaper] = useState("");
+  const wallpaperFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (wallpaperUrl !== undefined) setLocalWallpaper(wallpaperUrl || "");
@@ -989,8 +1047,29 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     await setSetting("accent_color", preset.accent);
   };
 
-  const handleWallpaperApply = async () => {
-    await setFlexibleSetting("wallpaper_url", localWallpaper.trim());
+  const handleWallpaperFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate it's an image
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file.");
+      return;
+    }
+
+    // Convert to Base64 data URL for local storage
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      setLocalWallpaper(base64);
+      await setFlexibleSetting("wallpaper_url", base64);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset input so same file can be selected again
+    if (wallpaperFileRef.current) {
+      wallpaperFileRef.current.value = "";
+    }
   };
 
   const handleWallpaperClear = async () => {
@@ -1121,36 +1200,36 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
         </Section>
 
         {/* ── Wallpaper ────────────────────────── */}
-        <Section title="Wallpaper" footer="Paste a URL to an image. Works best with Glass Mode enabled.">
+        <Section title="Wallpaper" footer="Select an image from your device. Works best with Glass Mode enabled.">
           <div className="px-4 py-3 border-b border-zinc-800/60">
             <input
-              type="url"
-              value={localWallpaper}
-              onChange={(e) => setLocalWallpaper(e.target.value)}
-              placeholder="https://example.com/wallpaper.jpg"
-              className="w-full bg-transparent text-[15px] text-zinc-200 outline-none placeholder:text-zinc-600"
+              ref={wallpaperFileRef}
+              type="file"
+              accept="image/*"
+              onChange={handleWallpaperFileSelect}
+              className="hidden"
             />
-          </div>
-          <div className="px-4 py-3 flex gap-2">
-            <button
-              type="button"
-              onClick={handleWallpaperApply}
-              disabled={!localWallpaper.trim()}
-              className="flex-1 rounded-lg px-4 py-2 text-[13px] font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Apply
-            </button>
-            <button
-              type="button"
-              onClick={handleWallpaperClear}
-              disabled={!wallpaperUrl}
-              className="rounded-lg px-4 py-2 text-[13px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Clear
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => wallpaperFileRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
+                <Image className="h-4 w-4" />
+                Choose Image
+              </button>
+              <button
+                type="button"
+                onClick={handleWallpaperClear}
+                disabled={!wallpaperUrl}
+                className="rounded-lg px-4 py-2 text-[13px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Clear
+              </button>
+            </div>
           </div>
           {wallpaperUrl && (
-            <div className="px-4 pb-3">
+            <div className="px-4 py-3">
               <div
                 className="w-full h-24 rounded-lg bg-cover bg-center border border-zinc-700/50"
                 style={{ backgroundImage: `url(${wallpaperUrl})` }}
@@ -1221,11 +1300,13 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 export function SettingsSheet({
   isOpen,
   onClose,
+  defaultScreen,
 }: {
   isOpen: boolean;
   onClose: () => void;
+  defaultScreen?: Screen;
 }) {
-  const [screen, setScreen] = useState<Screen>("root");
+  const [screen, setScreen] = useState<Screen>(defaultScreen || "root");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   // Load settings from DB (only for root screen toggles)
@@ -1287,12 +1368,14 @@ export function SettingsSheet({
     }
   };
 
-  // Reset to root when closing
+  // Reset to root when closing, or set to defaultScreen when opening
   useEffect(() => {
     if (!isOpen) {
       setScreen("root");
+    } else if (defaultScreen) {
+      setScreen(defaultScreen);
     }
-  }, [isOpen]);
+  }, [isOpen, defaultScreen]);
 
   if (!isOpen) return null;
 

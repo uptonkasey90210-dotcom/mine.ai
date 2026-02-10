@@ -53,10 +53,50 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   
   const MAX_ROWS = 4;
   const LINE_HEIGHT = 20;
   const MAX_HEIGHT = LINE_HEIGHT * MAX_ROWS;
+
+  // ═══ Capacitor Keyboard handling — prevent input from shooting to middle of screen ═══
+  useEffect(() => {
+    let cleanupFns: (() => void)[] = [];
+
+    const setupKeyboardListeners = async () => {
+      try {
+        const { Keyboard } = await import("@capacitor/keyboard");
+        
+        const showHandle = Keyboard.addListener("keyboardWillShow", (info: { keyboardHeight: number }) => {
+          setKeyboardOffset(info.keyboardHeight);
+        });
+        
+        const hideHandle = Keyboard.addListener("keyboardWillHide", () => {
+          setKeyboardOffset(0);
+        });
+
+        cleanupFns.push(
+          () => showHandle.then((h: { remove: () => void }) => h.remove()),
+          () => hideHandle.then((h: { remove: () => void }) => h.remove())
+        );
+      } catch {
+        // Capacitor Keyboard not available (web fallback)
+        // Use visualViewport API for mobile browsers
+        const vv = window.visualViewport;
+        if (vv) {
+          const handleResize = () => {
+            const offset = window.innerHeight - vv.height;
+            setKeyboardOffset(offset > 50 ? offset : 0);
+          };
+          vv.addEventListener("resize", handleResize);
+          cleanupFns.push(() => vv.removeEventListener("resize", handleResize));
+        }
+      }
+    };
+
+    setupKeyboardListeners();
+    return () => cleanupFns.forEach(fn => fn());
+  }, []);
 
   // Keep valueRef in sync with prop
   useEffect(() => {
@@ -155,7 +195,11 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
   }, [value, MAX_HEIGHT]);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-30 bg-black/60 backdrop-blur-xl border-t border-zinc-800/40 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+    <div
+      className="fixed bottom-0 left-0 right-0 z-30 bg-black/60 backdrop-blur-xl border-t border-zinc-800/40 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      data-glass-surface
+      style={keyboardOffset > 0 ? { bottom: `${keyboardOffset}px`, paddingBottom: '0.75rem' } : undefined}
+    >
       {/* File Pill */}
       {selectedFile && (
         <motion.div
