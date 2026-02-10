@@ -78,42 +78,76 @@ body {
 
 /* ─── Light Mode Overrides ──────────────────────────────────────── */
 html:not(.dark) {
-  --background: #ffffff;
+  --background: #f8f9fa;
   --foreground: #171717;
   --mine-bg: #f8f9fa;
   --mine-surface: #ffffff;
   --mine-border: #e5e7eb;
 }
 
-/* Light mode: override hardcoded dark backgrounds */
-html:not(.dark) [data-glass-surface],
+/* Light mode: header & input bar */
 html:not(.dark) header,
-html:not(.dark) .bg-black\/60 {
-  background-color: rgba(255, 255, 255, 0.85) !important;
+html:not(.dark) [data-glass-surface] {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
+/* Light mode: sidebar */
 html:not(.dark) aside {
   background-color: rgba(248, 249, 250, 0.95) !important;
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 
+/* Light mode: surface containers (settings rows, sections, cards) */
 html:not(.dark) .bg-zinc-900,
 html:not(.dark) .bg-zinc-900\/80,
 html:not(.dark) .bg-zinc-950 {
-  background-color: #f3f4f6 !important;
+  background-color: #ffffff !important;
+}
+
+html:not(.dark) .bg-zinc-900\/50 {
+  background-color: rgba(243, 244, 246, 0.8) !important;
+}
+
+html:not(.dark) .bg-zinc-900\/60 {
+  background-color: rgba(243, 244, 246, 0.7) !important;
 }
 
 html:not(.dark) .bg-zinc-800 {
-  background-color: #e5e7eb !important;
+  background-color: #f3f4f6 !important;
 }
 
+html:not(.dark) .bg-zinc-800\/80 {
+  background-color: rgba(243, 244, 246, 0.8) !important;
+}
+
+html:not(.dark) .bg-zinc-800\/60,
+html:not(.dark) .bg-zinc-800\/50,
+html:not(.dark) .bg-zinc-800\/30 {
+  background-color: rgba(243, 244, 246, 0.5) !important;
+}
+
+html:not(.dark) .bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html:not(.dark) .bg-black\/50 {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Light mode: text colors mapped to legible dark tones */
 html:not(.dark) .text-zinc-100 {
   color: #111827 !important;
 }
 
 html:not(.dark) .text-zinc-200 {
   color: #1f2937 !important;
+}
+
+html:not(.dark) .text-zinc-300 {
+  color: #374151 !important;
 }
 
 html:not(.dark) .text-zinc-400 {
@@ -128,10 +162,81 @@ html:not(.dark) .text-zinc-600 {
   color: #9ca3af !important;
 }
 
+/* Light mode: borders */
 html:not(.dark) .border-zinc-800\/40,
 html:not(.dark) .border-zinc-800\/50,
-html:not(.dark) .border-zinc-800\/60 {
+html:not(.dark) .border-zinc-800\/60,
+html:not(.dark) .border-zinc-800 {
   border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .border-zinc-700,
+html:not(.dark) .border-zinc-700\/40,
+html:not(.dark) .border-zinc-700\/50,
+html:not(.dark) .border-zinc-700\/60 {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Light mode: AI chat bubbles */
+html:not(.dark) .bg-zinc-900.text-zinc-100 {
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Light mode: prose/markdown in AI messages */
+html:not(.dark) .prose-invert {
+  --tw-prose-body: #374151 !important;
+  --tw-prose-headings: #111827 !important;
+  --tw-prose-code: #1e40af !important;
+}
+
+html:not(.dark) .prose-pre\:bg-zinc-950 pre {
+  background-color: #f3f4f6 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .prose-code\:bg-zinc-800\/50 code {
+  background-color: rgba(59, 130, 246, 0.08) !important;
+  color: #1e40af !important;
+}
+
+/* Light mode: input bar textarea */
+html:not(.dark) .bg-transparent.text-zinc-100 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .placeholder\:text-zinc-600::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Light mode: hover states */
+html:not(.dark) .hover\:bg-zinc-800\/50:hover,
+html:not(.dark) .hover\:bg-zinc-800\/60:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html:not(.dark) .hover\:bg-zinc-700\/60:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html:not(.dark) .hover\:text-zinc-200:hover,
+html:not(.dark) .hover\:text-zinc-100:hover {
+  color: #111827 !important;
+}
+
+html:not(.dark) .hover\:text-zinc-300:hover {
+  color: #374151 !important;
+}
+
+/* Light mode: active/pressed states */
+html:not(.dark) .active\:bg-zinc-800\/60:active {
+  background-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Light mode: ring offsets (accent color picker) */
+html:not(.dark) .ring-offset-zinc-950 {
+  --tw-ring-offset-color: #f8f9fa !important;
 }
 
 /* ─── Wallpaper Support ─────────────────────────────────────────── */
@@ -139,6 +244,47 @@ body.has-wallpaper {
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
+}
+
+/* Wallpaper layer — the div inside <main> that shows the wallpaper */
+.wallpaper-layer {
+  display: none;
+}
+
+html.has-wallpaper .wallpaper-layer {
+  display: block;
+  background-image: var(--wallpaper-url);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* When wallpaper is active, make the main bg layers transparent
+   so the wallpaper shows through regardless of glass mode */
+html.has-wallpaper [data-glass-bg] {
+  background-color: transparent !important;
+}
+
+/* When wallpaper is active, give header/input a frosted overlay for readability */
+html.has-wallpaper header {
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+html.has-wallpaper [data-glass-surface] {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+}
+
+/* Light mode + wallpaper: lighter frosted overlays */
+html.has-wallpaper:not(.dark) header {
+  background-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+html.has-wallpaper:not(.dark) [data-glass-surface] {
+  background-color: rgba(255, 255, 255, 0.65) !important;
 }
 
 /* ─── Glass Mode ────────────────────────────────────────────────── */
@@ -171,4 +317,22 @@ html.glass-mode aside {
 html.glass-mode .text-zinc-100,
 html.glass-mode .text-zinc-200 {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Light-mode glass mode */
+html.glass-mode:not(.dark) [data-glass-modal] {
+  background-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+html.glass-mode:not(.dark) [data-glass-surface] {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+html.glass-mode:not(.dark) aside {
+  background-color: rgba(248, 249, 250, 0.5) !important;
+}
+
+html.glass-mode:not(.dark) .text-zinc-100,
+html.glass-mode:not(.dark) .text-zinc-200 {
+  text-shadow: none;
 }

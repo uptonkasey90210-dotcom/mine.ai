@@ -474,6 +474,12 @@ export default function MineAIChat() {
 
       {/* Main Chat Area */}
       <main className="relative flex flex-col flex-1 h-full min-w-0">
+        {/* Wallpaper layer — sits behind chat content, fit to chat area */}
+        <div
+          className="absolute inset-0 z-0 wallpaper-layer"
+          aria-hidden="true"
+        />
+
         {/* Header with Safe Area */}
         <ChatHeader
           onMenuClick={() => setSidebarOpen(true)}

@@ -69,19 +69,26 @@ export function ThemeManager() {
     } else {
       root.classList.remove("dark");
       root.classList.add("light");
-      // Reset theme preset colors for light mode
+      // Set light-mode variables
       root.style.setProperty("--mine-bg", "#f8f9fa");
       root.style.setProperty("--mine-surface", "#ffffff");
       root.style.setProperty("--mine-border", "#e5e7eb");
-      root.style.setProperty("--background", "#ffffff");
-      document.body.style.backgroundColor = "#ffffff";
+      root.style.setProperty("--background", "#f8f9fa");
+      root.style.setProperty("--foreground", "#171717");
+      document.body.style.backgroundColor = "#f8f9fa";
     }
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleSystemThemeChange = (e: MediaQueryListEvent) => {
       if ((theme?.value || "dark") === "system") {
-        if (e.matches) root.classList.add("dark");
-        else root.classList.remove("dark");
+        const isDark = e.matches;
+        if (isDark) {
+          root.classList.add("dark");
+          root.classList.remove("light");
+        } else {
+          root.classList.remove("dark");
+          root.classList.add("light");
+        }
       }
     };
     mediaQuery.addEventListener("change", handleSystemThemeChange);
@@ -134,15 +141,22 @@ export function ThemeManager() {
   // 4. WALLPAPER
   useEffect(() => {
     const url = (wallpaper?.value as string) || "";
+    const root = document.documentElement;
     const body = document.body;
 
     if (url) {
+      // Set CSS variable so the wallpaper-layer element can use it
+      root.style.setProperty("--wallpaper-url", `url(${url})`);
+      root.classList.add("has-wallpaper");
+      // Also apply to body for full-bleed glass mode
       body.style.backgroundImage = `url(${url})`;
       body.style.backgroundSize = "cover";
       body.style.backgroundPosition = "center";
       body.style.backgroundRepeat = "no-repeat";
       body.classList.add("has-wallpaper");
     } else {
+      root.style.removeProperty("--wallpaper-url");
+      root.classList.remove("has-wallpaper");
       body.style.backgroundImage = "";
       body.classList.remove("has-wallpaper");
     }
