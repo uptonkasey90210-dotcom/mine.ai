@@ -195,12 +195,17 @@ export function Sidebar({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
+        {/* Tap anywhere in the list background to close any open swipe row */}
+        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+        <div className="flex-1 overflow-hidden" onPointerDown={(e) => {
+          // Only reset on taps that land directly on the scroll area background,
+          // not on child thread rows (those handle their own events).
+          if (openSwipeId && e.target === e.currentTarget) {
+            handleCloseAllSwipes();
+          }
+        }}>
           {activeTab === "chats" ? (
             <div className="h-full overflow-y-auto px-2 pb-2">
-              {/* Click-outside listener: tapping the list background closes any open swipe */}
-              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-              <div onClick={handleCloseAllSwipes}>
               <div className="px-2 py-2">
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
                   Recent — Swipe left for options
@@ -214,6 +219,7 @@ export function Sidebar({
                     isActive={thread.id === activeThreadId}
                     openSwipeId={openSwipeId}
                     onSwipeOpen={handleSwipeOpen}
+                    onSwipeClose={handleCloseAllSwipes}
                     onClick={() => {
                       handleCloseAllSwipes();
                       onSelectThread(thread.id);
@@ -223,7 +229,6 @@ export function Sidebar({
                     onDelete={(id) => handleDeleteThread(id)}
                   />
                 ))}
-              </div>
               </div>
             </div>
           ) : (
