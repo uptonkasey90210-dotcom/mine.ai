@@ -1101,7 +1101,6 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     document.documentElement.style.fontSize = sizeMap[size] || "16px";
   };
 
-  // Apply text size on load
   useEffect(() => {
     if (textSize) {
       const sizeMap = { small: "14px", medium: "16px", large: "18px" };
@@ -1109,57 +1108,72 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
     }
   }, [textSize]);
 
+  const APPEARANCE_MODES = ["System", "Light", "Dark"] as const;
+  const TEXT_SIZES = [
+    { id: "small" as const, label: "Small", sample: "Aa" },
+    { id: "medium" as const, label: "Medium", sample: "Aa" },
+    { id: "large" as const, label: "Large", sample: "Aa" },
+  ];
+
   return (
     <div className="flex h-full flex-col">
       <SubHeader title="Appearance" onBack={onBack} />
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-8">
-        {/* ── Theme Mode ───────────────────────── */}
+
+        {/* ── Theme Mode ─── Segmented control instead of dropdown ── */}
         <Section title="Theme">
           <div className="px-4 py-3">
-            <select
-              value={appearance || "System"}
-              onChange={(e) => handleAppearanceChange(e.target.value)}
-              className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
-            >
-              <option>System</option>
-              <option>Light</option>
-              <option>Dark</option>
-            </select>
+            <div className="flex rounded-lg bg-zinc-800 p-1">
+              {APPEARANCE_MODES.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => handleAppearanceChange(mode)}
+                  className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all ${
+                    (appearance || "System") === mode
+                      ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
           </div>
         </Section>
 
-        {/* ── Theme Presets ─────────────────────── */}
-        <Section title="Presets" footer="Pick a colour scheme. This also sets the accent colour.">
+        {/* ── Theme Presets ── Larger swatches, 3-col grid ── */}
+        <Section title="Color Theme" footer="Sets the overall color palette and accent.">
           <div className="px-4 py-4">
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {THEME_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
                   type="button"
                   onClick={() => handlePresetSelect(preset)}
-                  className={`relative flex flex-col items-center gap-1.5 rounded-xl p-2 transition-all ${
+                  className={`relative flex flex-col items-center gap-2 rounded-xl p-3 transition-all ${
                     themePreset === preset.id
                       ? "ring-2 ring-blue-500 bg-zinc-800/60"
                       : "hover:bg-zinc-800/30"
                   }`}
                 >
                   <div
-                    className="w-10 h-10 rounded-lg border border-white/10 overflow-hidden"
+                    className="w-full h-12 rounded-lg border border-white/10 overflow-hidden"
                     style={{
                       background: `linear-gradient(135deg, ${preset.surface}, ${preset.bg})`,
                     }}
                   >
                     <div
-                      className="w-3 h-3 rounded-full mt-1.5 ml-1.5"
+                      className="w-4 h-4 rounded-full mt-2 ml-2"
                       style={{ backgroundColor: preset.accent }}
                     />
                   </div>
-                  <span className="text-[10px] text-zinc-400 leading-tight text-center">
+                  <span className="text-[11px] text-zinc-400 leading-tight text-center font-medium">
                     {preset.name}
                   </span>
                   {themePreset === preset.id && (
-                    <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
-                      <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                    <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
                     </div>
                   )}
                 </button>
@@ -1168,40 +1182,38 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           </div>
         </Section>
 
-        {/* ── Accent Color ─────────────────────── */}
-        <Section title="Accent Color" footer="Choose your preferred accent color for buttons and highlights.">
-          <div className="px-4 py-5">
-            <div className="grid grid-cols-4 gap-x-6 gap-y-4 justify-items-center">
+        {/* ── Accent Color Override ── Collapsed into a row that expands ── */}
+        <Section title="Accent Color" footer="Override the accent from the color theme above.">
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-center gap-3 flex-wrap">
               {ACCENT_COLORS.map((color) => (
                 <button
                   key={color.hex}
                   type="button"
                   onClick={() => handleColorSelect(color.hex)}
-                  className="relative flex flex-col items-center gap-1.5 group"
+                  className="relative group"
+                  title={color.name}
                 >
                   <div
-                    className={`w-12 h-12 rounded-full ${color.class} flex items-center justify-center transition-all group-hover:scale-110 ${
+                    className={`w-9 h-9 rounded-full ${color.class} flex items-center justify-center transition-transform group-hover:scale-110 ${
                       accentColor === color.hex
                         ? "ring-2 ring-zinc-100 ring-offset-2 ring-offset-zinc-950"
                         : ""
                     }`}
                   >
                     {accentColor === color.hex && (
-                      <Check className="h-5 w-5 text-white" strokeWidth={3} />
+                      <Check className="h-4 w-4 text-white" strokeWidth={3} />
                     )}
                   </div>
-                  <span className="text-[10px] text-zinc-500 group-hover:text-zinc-300 transition-colors">
-                    {color.name}
-                  </span>
                 </button>
               ))}
             </div>
           </div>
         </Section>
 
-        {/* ── Wallpaper ────────────────────────── */}
-        <Section title="Wallpaper" footer="Select an image from your device. Works best with Glass Mode enabled.">
-          <div className="px-4 py-3 border-b border-zinc-800/60">
+        {/* ── Wallpaper & Glass Mode ── Grouped together ── */}
+        <Section title="Background" footer="Wallpapers work best with Glass Mode enabled.">
+          <div className="px-4 py-3">
             <input
               ref={wallpaperFileRef}
               type="file"
@@ -1216,36 +1228,30 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
                 className="flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[13px] font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors"
               >
                 <Image className="h-4 w-4" />
-                Choose Image
+                Choose Wallpaper
               </button>
-              <button
-                type="button"
-                onClick={handleWallpaperClear}
-                disabled={!wallpaperUrl}
-                className="rounded-lg px-4 py-2 text-[13px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Clear
-              </button>
+              {wallpaperUrl && (
+                <button
+                  type="button"
+                  onClick={handleWallpaperClear}
+                  className="rounded-lg px-4 py-2 text-[13px] font-medium bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
             </div>
           </div>
           {wallpaperUrl && (
-            <div className="px-4 py-3">
+            <div className="px-4 pb-3">
               <div
                 className="w-full h-24 rounded-lg bg-cover bg-center border border-zinc-700/50"
                 style={{ backgroundImage: `url(${wallpaperUrl})` }}
               />
             </div>
           )}
-        </Section>
-
-        {/* ── Glass Mode ───────────────────────── */}
-        <Section
-          title="Effects"
-          footer="Glassmorphism makes surfaces semi-transparent with a blur. Best paired with a wallpaper."
-        >
           <Row
             icon={<Layers className="h-5 w-5" />}
-            label="Glass Mode (Blur)"
+            label="Glass Mode"
             toggle
             toggleValue={glassMode ?? false}
             onToggle={handleGlassToggle}
@@ -1253,41 +1259,56 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
           />
         </Section>
 
-        {/* ── Text Size ────────────────────────── */}
-        <Section title="Text Size">
+        {/* ── Text & Layout ── Grouped together ── */}
+        <Section title="Text & Layout">
+          {/* Text Size — segmented control */}
+          <div className="px-4 py-3 border-b border-zinc-800/60">
+            <label className="text-[13px] text-zinc-500 mb-2 block">Text Size</label>
+            <div className="flex rounded-lg bg-zinc-800 p-1">
+              {TEXT_SIZES.map((size) => (
+                <button
+                  key={size.id}
+                  type="button"
+                  onClick={() => handleTextSizeChange(size.id)}
+                  className={`flex-1 rounded-md px-3 py-2 transition-all ${
+                    (textSize || "medium") === size.id
+                      ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  <span
+                    className={`font-medium ${
+                      size.id === "small" ? "text-[12px]" : size.id === "medium" ? "text-[14px]" : "text-[16px]"
+                    }`}
+                  >
+                    {size.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Bubble Style — segmented control */}
           <div className="px-4 py-3">
-            <select
-              value={textSize || "medium"}
-              onChange={(e) =>
-                handleTextSizeChange(e.target.value as "small" | "medium" | "large")
-              }
-              className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
-            >
-              <option value="small">Small</option>
-              <option value="medium">Medium</option>
-              <option value="large">Large</option>
-            </select>
+            <label className="text-[13px] text-zinc-500 mb-2 block">Bubble Style</label>
+            <div className="flex rounded-lg bg-zinc-800 p-1">
+              {BUBBLE_STYLE_OPTIONS.map((style) => (
+                <button
+                  key={style.id}
+                  type="button"
+                  onClick={() => handleBubbleStyleChange(style.id)}
+                  className={`flex-1 rounded-md px-3 py-2 text-[13px] font-medium transition-all ${
+                    (bubbleStyle || "default") === style.id
+                      ? "bg-zinc-700 text-zinc-100 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-300"
+                  }`}
+                >
+                  {style.name}
+                </button>
+              ))}
+            </div>
           </div>
         </Section>
 
-        {/* ── Bubble Style ─────────────────────── */}
-        <Section title="Message Bubble Style" footer="Choose how your chat messages appear">
-          <div className="px-4 py-3">
-            <select
-              value={bubbleStyle || "default"}
-              onChange={(e) =>
-                handleBubbleStyleChange(e.target.value as "default" | "modern" | "compact")
-              }
-              className="w-full rounded-xl bg-zinc-800 px-4 py-3 text-[15px] text-zinc-200 outline-none border border-zinc-700"
-            >
-              {BUBBLE_STYLE_OPTIONS.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </Section>
       </div>
     </div>
   );

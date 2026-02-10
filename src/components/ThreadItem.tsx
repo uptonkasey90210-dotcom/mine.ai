@@ -85,8 +85,8 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Action buttons revealed behind the item */}
-      <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
+      {/* Action buttons revealed behind the item — only mount when swiped open */}
+      {isOpen && <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onArchive?.(thread.id); onSwipeClose(); }}
@@ -103,7 +103,7 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
           <Trash2 size={16} />
           Delete
         </button>
-      </div>
+      </div>}
 
       {/* Swipeable foreground */}
       <motion.div
@@ -120,10 +120,10 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
           type="button"
           onClick={handleClick}
           className={cn(
-            "w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors bg-zinc-950",
+            "w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors",
             isActive
-              ? "bg-blue-600/10 text-zinc-100"
-              : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200",
+              ? "bg-[#141a2e] text-zinc-100"
+              : "bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
           )}
         >
           <div className="shrink-0 mt-0.5">
