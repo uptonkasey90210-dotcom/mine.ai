@@ -17,7 +17,7 @@ export const THEME_PRESETS = [
 ];
 
 // ─── Hex → HSL for Tailwind CSS variable support ────────────────
-function hexToHSL(hex: string) {
+export function hexToHSL(hex: string) {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) return null;
 
@@ -120,22 +120,35 @@ export function ThemeManager() {
     document.documentElement.style.fontSize = sizeMap[size] || "16px";
   }, [fontSize]);
 
-  // 3. THEME PRESET (background colours — only in dark mode)
+  // 3. THEME PRESET (background colours)
   useEffect(() => {
     const root = document.documentElement;
-    const isDark = root.classList.contains("dark");
-    if (!isDark) return; // Don't apply dark presets in light mode
+    const mode = theme?.value || "dark";
+    let effectiveMode = mode;
+    if (mode === "system") {
+      effectiveMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
 
-    const presetId = (themePreset?.value as string) || "default";
-    const preset = THEME_PRESETS.find(p => p.id === presetId) || THEME_PRESETS[0];
+    if (effectiveMode === "light") {
+      // Light mode: always apply light palette, ignore dark presets
+      root.style.setProperty("--mine-bg", "#f8f9fa");
+      root.style.setProperty("--mine-surface", "#ffffff");
+      root.style.setProperty("--mine-border", "#e5e7eb");
+      root.style.setProperty("--background", "#f8f9fa");
+      root.style.setProperty("--foreground", "#171717");
+      document.body.style.backgroundColor = "#f8f9fa";
+    } else {
+      // Dark mode: apply the selected preset
+      const presetId = (themePreset?.value as string) || "default";
+      const preset = THEME_PRESETS.find(p => p.id === presetId) || THEME_PRESETS[0];
 
-    root.style.setProperty("--mine-bg", preset.bg);
-    root.style.setProperty("--mine-surface", preset.surface);
-    root.style.setProperty("--mine-border", preset.border);
-
-    // Update --background so Tailwind's bg-background tracks the preset
-    root.style.setProperty("--background", preset.bg);
-    document.body.style.backgroundColor = preset.bg;
+      root.style.setProperty("--mine-bg", preset.bg);
+      root.style.setProperty("--mine-surface", preset.surface);
+      root.style.setProperty("--mine-border", preset.border);
+      root.style.setProperty("--background", preset.bg);
+      root.style.setProperty("--foreground", "#fafafa");
+      document.body.style.backgroundColor = preset.bg;
+    }
   }, [themePreset, theme]);
 
   // 4. WALLPAPER

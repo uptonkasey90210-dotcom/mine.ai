@@ -41,7 +41,7 @@ import {
 } from "lucide-react";
 import { db, getSetting, setSetting, getAllSettings, toggleArchiveThread, deleteThread, getFlexibleSetting, setFlexibleSetting, debugAllSettings } from "@/lib/db";
 import { fetchModels } from "@/lib/api";
-import { THEME_PRESETS } from "./ThemeManager";
+import { THEME_PRESETS, hexToHSL } from "./ThemeManager";
 
 // ─── Types ───────────────────────────────────────────────────────
 type Screen = "root" | "security" | "data" | "about" | "ai" | "appearance" | "archived" | "identity";
@@ -67,6 +67,16 @@ const ACCENT_COLORS = [
   { name: "Cyan", hex: "#06b6d4", class: "bg-cyan-500" },
 ];
 
+// ─── Platform detection ──────────────────────────────────────────
+async function isNativePlatform(): Promise<boolean> {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
+
 // ─── Export User Data ────────────────────────────────────────────
 async function exportUserData() {
   try {
@@ -84,18 +94,40 @@ async function exportUserData() {
       },
     };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `mine-ai-backup-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const fileName = `mine-ai-backup-${new Date().toISOString().split("T")[0]}.json`;
+
+    if (await isNativePlatform()) {
+      // ── Native (Capacitor / iOS / Android) ──
+      const { Filesystem, Directory, Encoding } = await import("@capacitor/filesystem");
+      const { Share } = await import("@capacitor/share");
+
+      const writeResult = await Filesystem.writeFile({
+        path: fileName,
+        data: jsonString,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+      });
+
+      await Share.share({
+        title: "mine.ai Backup",
+        text: "Here is your mine.ai data export.",
+        url: writeResult.uri,
+        dialogTitle: "Share your backup",
+      });
+    } else {
+      // ── Web browser ──
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
     return true;
   } catch (error) {
     console.error("Export failed:", error);
@@ -147,7 +179,7 @@ function Section({
           {title}
         </h3>
       )}
-      <div className="mx-0 overflow-hidden rounded-xl bg-zinc-900/80">
+      <div className="mx-0 overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900/80">
         {children}
       </div>
       {footer && (
@@ -184,16 +216,16 @@ function Row({
   const content = (
     <div
       className={`flex min-h-[48px] items-center gap-3 px-4 py-3 ${
-        !isLast ? "border-b border-zinc-800/60" : ""
+        !isLast ? "border-b border-zinc-200 dark:border-zinc-800/60" : ""
       }`}
     >
       {icon && (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-400">
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center text-zinc-500 dark:text-zinc-400">
           {icon}
         </span>
       )}
       <span
-        className={`flex-1 text-[16px] ${destructive ? "text-red-400" : "text-zinc-100"}`}
+        className={`flex-1 text-[16px] ${destructive ? "text-red-500 dark:text-red-400" : "text-zinc-900 dark:text-zinc-100"}`}
       >
         {label}
       </span>
@@ -234,16 +266,16 @@ function SubHeader({
   rightAction?: ReactNode;
 }) {
   return (
-    <div className="relative flex h-14 items-center justify-center px-4 border-b border-zinc-800/40">
+    <div className="relative flex h-14 items-center justify-center px-4 border-b border-zinc-200 dark:border-zinc-800/40">
       <button
         type="button"
         onClick={onBack}
-        className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 text-zinc-300 active:bg-zinc-800"
+        className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 active:bg-zinc-100 dark:active:bg-zinc-800"
         aria-label="Back"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
-      <h2 className="text-[17px] font-semibold text-zinc-100">{title}</h2>
+      <h2 className="text-[17px] font-semibold text-zinc-900 dark:text-zinc-100">{title}</h2>
       {rightAction && <div className="absolute right-3">{rightAction}</div>}
     </div>
   );
@@ -283,7 +315,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setSetting("temperature", localTemperature);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localTemperature]);
+  }, [localTemperature, settings]);
 
   // Auto-save top_p on change (debounced)
   useEffect(() => {
@@ -292,7 +324,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setSetting("top_p", localTopP);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localTopP]);
+  }, [localTopP, settings]);
 
   // Auto-save context length on change (debounced)
   useEffect(() => {
@@ -301,7 +333,7 @@ function AISettingsScreen({ onBack }: { onBack: () => void }) {
       setSetting("context_length", localContextLength);
     }, 300);
     return () => clearTimeout(timer);
-  }, [localContextLength]);
+  }, [localContextLength, settings]);
 
   // Fetch models when API URL changes
   useEffect(() => {
@@ -653,6 +685,11 @@ function DataScreen({ onBack }: { onBack: () => void }) {
   const [isExporting, setIsExporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // HOOK FIX: useLiveQuery must be called at the top level of the component,
+  // not inline inside JSX render expressions.
+  const threadCount = useLiveQuery(() => db.threads.count()) ?? 0;
+  const messageCount = useLiveQuery(() => db.messages.count()) ?? 0;
+
   const handleExport = async () => {
     setIsExporting(true);
     const success = await exportUserData();
@@ -746,13 +783,13 @@ function DataScreen({ onBack }: { onBack: () => void }) {
             <div className="flex justify-between items-center mb-2">
               <span className="text-[14px] text-zinc-400">Total conversations</span>
               <span className="text-[14px] text-zinc-300">
-                {useLiveQuery(() => db.threads.count()) ?? 0}
+                {threadCount}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[14px] text-zinc-400">Total messages</span>
               <span className="text-[14px] text-zinc-300">
-                {useLiveQuery(() => db.messages.count()) ?? 0}
+                {messageCount}
               </span>
             </div>
           </div>
@@ -1037,9 +1074,7 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
 
   const handleColorSelect = async (hex: string) => {
     await setSetting("accent_color", hex);
-    document.documentElement.style.setProperty("--accent-color", hex);
-    document.documentElement.style.setProperty("--primary", hex);
-    document.documentElement.style.setProperty("--ring", hex);
+    // ThemeManager will pick up the DB change and apply CSS variables (HSL)
   };
 
   const handlePresetSelect = async (preset: (typeof THEME_PRESETS)[number]) => {
@@ -1086,13 +1121,15 @@ function AppearanceScreen({ onBack }: { onBack: () => void }) {
   };
 
   const handleAppearanceChange = async (value: string) => {
-    await setSetting("appearance", value);
     const modeMap: Record<string, "dark" | "light" | "system"> = {
       Dark: "dark",
       Light: "light",
       System: "system",
     };
-    await setSetting("theme_mode", modeMap[value] || "dark");
+    const mode = modeMap[value] || "dark";
+    // Write both keys atomically so they stay in sync (lowercase values)
+    await setSetting("appearance", value);
+    await setSetting("theme_mode", mode);
   };
 
   const handleTextSizeChange = async (size: "small" | "medium" | "large") => {
@@ -1351,14 +1388,7 @@ export function SettingsSheet({
     fetchAvailableModels();
   }, [apiUrl]);
 
-  // Apply accent color on load and when it changes
-  useEffect(() => {
-    if (accentColor) {
-      document.documentElement.style.setProperty("--accent-color", accentColor);
-      document.documentElement.style.setProperty("--primary", accentColor);
-      document.documentElement.style.setProperty("--ring", accentColor);
-    }
-  }, [accentColor]);
+  // Accent color is applied by ThemeManager — no duplicate DOM writes here.
 
   const handleHapticToggle = async (value: boolean) => {
     await setSetting("haptic_enabled", value);
@@ -1398,6 +1428,19 @@ export function SettingsSheet({
     }
   }, [isOpen, defaultScreen]);
 
+  // ── Escape key closes the sheet ──
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -1410,7 +1453,7 @@ export function SettingsSheet({
       />
 
       {/* modal container */}
-      <div className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-zinc-950 sm:h-[85vh] sm:rounded-3xl" data-glass-modal>
+      <div className="relative z-10 flex h-[92dvh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl bg-white dark:bg-zinc-950 sm:h-[85vh] sm:rounded-3xl" data-glass-modal>
         {screen === "ai" && <AISettingsScreen onBack={() => setScreen("root")} />}
         {screen === "security" && <SecurityScreen onBack={() => setScreen("root")} />}
         {screen === "data" && <DataScreen onBack={() => setScreen("root")} />}
@@ -1422,14 +1465,14 @@ export function SettingsSheet({
         {screen === "root" && (
           <>
             {/* header */}
-            <div className="relative flex h-14 shrink-0 items-center justify-center border-b border-zinc-800/40">
-              <h2 className="text-[17px] font-semibold text-zinc-100">
+            <div className="relative flex h-14 shrink-0 items-center justify-center border-b border-zinc-200 dark:border-zinc-800/40">
+              <h2 className="text-[17px] font-semibold text-zinc-900 dark:text-zinc-100">
                 Settings
               </h2>
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 text-zinc-400 active:bg-zinc-800"
+                className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 active:bg-zinc-100 dark:active:bg-zinc-800"
                 aria-label="Close settings"
               >
                 <X className="h-5 w-5" />
@@ -1537,7 +1580,7 @@ export function SettingsSheet({
               </Section>
 
               {/* ── Danger Zone ─────────────────────── */}
-              <div className="overflow-hidden rounded-xl bg-zinc-900/80">
+              <div className="overflow-hidden rounded-xl bg-zinc-100 dark:bg-zinc-900/80">
                 <Row
                   icon={<LogOut className="h-5 w-5" />}
                   label="Clear all data"

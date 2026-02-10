@@ -20,12 +20,17 @@ declare global {
 }
 
 // Speech recognition types (browser APIs don't have official TypeScript types)
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  [index: number]: { transcript: string; confidence: number };
+}
+
 interface SpeechRecognitionEvent {
   resultIndex: number;
   results: {
     length: number;
-    item(index: number): { transcript: string; confidence: number }[];
-    [index: number]: { transcript: string; confidence: number }[];
+    item(index: number): SpeechRecognitionResult;
+    [index: number]: SpeechRecognitionResult;
   };
 }
 
@@ -76,8 +81,8 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
         });
 
         cleanupFns.push(
-          () => showHandle.then((h: { remove: () => void }) => h.remove()),
-          () => hideHandle.then((h: { remove: () => void }) => h.remove())
+          () => showHandle.then((h: { remove: () => void }) => h.remove()).catch(() => {}),
+          () => hideHandle.then((h: { remove: () => void }) => h.remove()).catch(() => {})
         );
       } catch {
         // Capacitor Keyboard not available (web fallback)
@@ -116,10 +121,16 @@ export function ChatInput({ value, onChange, onSubmit, isTyping, onStop }: ChatI
         recognition.onresult = (event: SpeechRecognitionEvent) => {
           let transcript = "";
           for (let i = event.resultIndex; i < event.results.length; i++) {
-            transcript += event.results[i][0].transcript;
+            // Only append final results to prevent "hello hello hello" duplication
+            // when interimResults is enabled
+            if (event.results[i].isFinal) {
+              transcript += event.results[i][0].transcript;
+            }
           }
-          // Use ref for current value to avoid stale closure
-          onChange(valueRef.current + transcript);
+          if (transcript) {
+            // Use ref for current value to avoid stale closure
+            onChange(valueRef.current + transcript);
+          }
         };
 
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {

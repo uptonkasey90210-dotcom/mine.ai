@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { motion, useAnimation, type PanInfo } from "framer-motion";
 import { MessageSquare, Archive, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -24,16 +24,30 @@ function formatThreadDate(date: Date): string {
   return `${days}d ago`;
 }
 
-const SWIPE_THRESHOLD = -60;
+const SWIPE_THRESHOLD = -100;
 const ACTION_BUTTON_WIDTH = 140;
 
 export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipeClose, onClick, onArchive, onDelete }: ThreadItemProps) {
   const controls = useAnimation();
   const isOpen = openSwipeId === thread.id;
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Guard: distinguish drags from taps. Set true on drag start, cleared after a timeout.
   const didDragRef = useRef(false);
   const dragTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!showContextMenu) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setShowContextMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showContextMenu]);
 
   // Auto-close when parent tells us another item opened or swipes were reset
   useEffect(() => {
@@ -83,6 +97,18 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
     return () => { if (dragTimerRef.current) clearTimeout(dragTimerRef.current); };
   }, []);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setShowContextMenu((prev) => !prev);
+  }, []);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      onDelete?.(thread.id);
+    }
+  }, [onDelete, thread.id]);
+
   return (
     <div className="relative overflow-hidden rounded-xl">
       {/* Action buttons revealed behind the item — only mount when swiped open */}
@@ -91,6 +117,7 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
           type="button"
           onClick={(e) => { e.stopPropagation(); onArchive?.(thread.id); onSwipeClose(); }}
           className="flex items-center justify-center w-[70px] bg-blue-600 text-white text-[11px] font-medium gap-1 flex-col"
+          aria-label={`Archive ${thread.title}`}
         >
           <Archive size={16} />
           Archive
@@ -99,6 +126,7 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
           type="button"
           onClick={(e) => { e.stopPropagation(); onDelete?.(thread.id); onSwipeClose(); }}
           className="flex items-center justify-center w-[70px] bg-red-600 text-white text-[11px] font-medium gap-1 flex-col"
+          aria-label={`Delete ${thread.title}`}
         >
           <Trash2 size={16} />
           Delete
@@ -119,11 +147,13 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
         <button
           type="button"
           onClick={handleClick}
+          onContextMenu={handleContextMenu}
+          onKeyDown={handleKeyDown}
           className={cn(
             "w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors",
             isActive
-              ? "bg-[#141a2e] text-zinc-100"
-              : "bg-zinc-950 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+              ? "bg-blue-50 dark:bg-blue-950/40 text-zinc-900 dark:text-zinc-100"
+              : "bg-white dark:bg-zinc-950 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-200",
           )}
         >
           <div className="shrink-0 mt-0.5">
@@ -144,6 +174,35 @@ export function ThreadItem({ thread, isActive, openSwipeId, onSwipeOpen, onSwipe
           </div>
         </button>
       </motion.div>
+
+      {/* Context menu for keyboard/right-click users */}
+      {showContextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="absolute right-2 top-full mt-1 z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]"
+        >
+          {onArchive && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onArchive(thread.id); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors text-left"
+            >
+              <Archive size={14} />
+              Archive
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowContextMenu(false); onDelete(thread.id); }}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-400 hover:bg-red-900/30 transition-colors text-left"
+            >
+              <Trash2 size={14} />
+              Delete
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

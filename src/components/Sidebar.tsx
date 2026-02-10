@@ -247,7 +247,7 @@ export function Sidebar({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => { onOpenIdentity?.(); onClose(); }}
+              onClick={() => { onClose(); setTimeout(() => onOpenIdentity?.(), 300); }}
               className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0">

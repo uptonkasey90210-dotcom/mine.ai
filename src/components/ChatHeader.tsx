@@ -24,20 +24,27 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   const modelName = useLiveQuery(() => getSetting('modelName'));
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [lastFetchedUrl, setLastFetchedUrl] = useState<string | null>(null);
 
-  // Fetch available models on mount
+  // Fetch available models on mount with stale-while-revalidate caching.
+  // Skips re-fetching if models are already loaded for the current API URL.
   useEffect(() => {
     const loadModels = async () => {
       const settings = await getAllSettings();
       if (settings.apiUrl) {
+        // Skip fetch if we already have models for this URL
+        if (availableModels.length > 0 && lastFetchedUrl === settings.apiUrl) {
+          return;
+        }
         const result = await fetchModels(settings.apiUrl);
         if (result.success && result.models.length > 0) {
           setAvailableModels(result.models);
+          setLastFetchedUrl(settings.apiUrl);
         }
       }
     };
     loadModels();
-  }, []);
+  }, [modelName]); // Re-fetch when model changes (implies possible URL change)
 
   const handleModelChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newModel = e.target.value;
@@ -86,10 +93,10 @@ export function ChatHeader({
               <select
                 value={modelName || ''}
                 onChange={handleModelChange}
-                className="bg-transparent text-[14px] font-semibold text-zinc-100 leading-tight tracking-tight outline-none cursor-pointer hover:text-blue-400 transition-colors max-w-[200px] truncate"
+                className="bg-transparent text-[14px] font-semibold text-zinc-900 dark:text-zinc-100 leading-tight tracking-tight outline-none cursor-pointer hover:text-blue-500 dark:hover:text-blue-400 transition-colors max-w-[200px] truncate"
               >
                 {availableModels.map((model) => (
-                  <option key={model} value={model} className="bg-zinc-900 text-zinc-100">
+                  <option key={model} value={model} className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
                     {model}
                   </option>
                 ))}

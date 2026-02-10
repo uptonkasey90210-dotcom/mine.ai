@@ -41,8 +41,17 @@ export default function MineAIChat() {
   const [activeCharacterId, setActiveCharacterId] = useState<number | null>(null);
   const [activeCharacter, setActiveCharacter] = useState<Character | null>(null);
   const [modelStatus, setModelStatus] = useState<"online" | "offline" | "unknown">("unknown");
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const errorToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  /** Show a transient glassmorphism error toast */
+  const showErrorToast = useCallback((msg: string) => {
+    setErrorToast(msg);
+    if (errorToastTimer.current) clearTimeout(errorToastTimer.current);
+    errorToastTimer.current = setTimeout(() => setErrorToast(null), 6000);
+  }, []);
 
   // Initialize database on mount
   useEffect(() => {
@@ -189,7 +198,7 @@ export default function MineAIChat() {
 
     // Add user message to DB (display version with filename)
     await addMessage(threadId, "user", displayMessage);
-    setInputValue("");
+    // Don't clear input yet — only clear after successful stream
     setIsTyping(true);
 
     // Prepare AI message
@@ -225,19 +234,8 @@ export default function MineAIChat() {
     }
 
     // ═══ USER PROFILE INJECTION ═══
-    // Inject user identity into the system prompt for ALL chats (character and default)
-    // This gives the AI context about who it's talking to.
-    const userProfile = await getFlexibleSetting("user_profile", null);
-    if (userProfile) {
-      const profileParts: string[] = [];
-      if (userProfile.displayName) profileParts.push(`Name: ${userProfile.displayName}`);
-      if (userProfile.role) profileParts.push(`Role: ${userProfile.role}`);
-      if (userProfile.bio) profileParts.push(`Context: ${userProfile.bio}`);
-      if (userProfile.location) profileParts.push(`Location: ${userProfile.location}`);
-      if (profileParts.length > 0) {
-        systemPrompt += `\n\n[USER PROFILE]\nYou are speaking with the following user:\n${profileParts.join('\n')}`;
-      }
-    }
+    // REMOVED: Profile injection is now handled centrally by api.ts (streamAIResponse)
+    // to prevent double-injection. See api.ts "IDENTITY INJECTION (Service-Level)".
 
     // Prepare message history
     const history = await db.messages
@@ -339,42 +337,42 @@ export default function MineAIChat() {
         },
         onComplete: () => {
           setIsTyping(false);
+          setInputValue(""); // Clear input on success
           abortControllerRef.current = null;
         },
         onError: (error) => {
           // Don't show error if user manually aborted
           if (error.name === "AbortError") {
             setIsTyping(false);
+            setInputValue(""); // user intentionally stopped
             abortControllerRef.current = null;
             return;
           }
-          /* REFACTOR: Structured error handling with user-friendly messages.
-             NetworkError provides pre-classified error kinds (offline, timeout,
-             unreachable) with actionable user messages. */
+          /* REFACTOR: Errors go to a floating toast — NOT saved to DB.
+             The empty AI placeholder is removed so the conversation
+             stays clean and the user can retry with input preserved. */
           console.error("Streaming error:", error);
           setModelStatus("offline");
           const userMsg = error instanceof NetworkError
             ? error.userMessage
             : `Error: ${error.message}`;
-          updateMessage(aiMessageId, {
-            content: `❌ ${userMsg}\n\nPlease check your API settings and connection.`,
-          }).catch((err) => {
-            console.error("Failed to update error message:", err);
-          });
+          // Remove the empty AI placeholder message
+          db.messages.delete(aiMessageId).catch(() => {});
+          showErrorToast(`${userMsg} — check your API settings and connection.`);
           setIsTyping(false);
+          // Input is NOT cleared — user can retry
         },
       });
     } catch (error) {
       console.error("Failed to send message:", error);
       setModelStatus("offline");
-      await updateMessage(aiMessageId, {
-        content: `❌ Unexpected error occurred. Please try again.`,
-      }).catch((err) => {
-        console.error("Failed to update error message:", err);
-      });
+      // Remove the empty AI placeholder message
+      db.messages.delete(aiMessageId).catch(() => {});
+      showErrorToast("Unexpected error occurred. Please try again.");
       setIsTyping(false);
+      // Input is NOT cleared — user can retry
     }
-  }, [isTyping, activeThreadId]); // Removed activeCharacter - now fetched fresh from DB
+  }, [isTyping, activeThreadId]); // isTyping guards re-entry; activeThreadId for thread context. DB reads are JIT-fetched (not closured).
 
   const handleClearChat = useCallback(async () => {
     if (!activeThreadId) return;
@@ -508,6 +506,27 @@ export default function MineAIChat() {
           isTyping={isTyping}
           onStop={handleStop}
         />
+
+        {/* ── Glassmorphism Error Toast ── */}
+        {errorToast && (
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-sm w-[90%] animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div
+              className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-950/60 px-4 py-3 shadow-lg backdrop-blur-xl"
+              role="alert"
+            >
+              <span className="mt-0.5 shrink-0 text-red-400">&#x26A0;</span>
+              <p className="flex-1 text-sm text-red-200 leading-snug">{errorToast}</p>
+              <button
+                type="button"
+                onClick={() => setErrorToast(null)}
+                className="shrink-0 text-red-400/60 hover:text-red-300 transition-colors"
+                aria-label="Dismiss"
+              >
+                &#x2715;
+              </button>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

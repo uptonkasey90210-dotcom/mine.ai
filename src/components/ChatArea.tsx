@@ -84,7 +84,7 @@ export function ChatArea({ threadId, isTyping, bubbleStyle = "default", characte
         <WelcomeBanner onSuggestionClick={onSuggestionClick} />
       ) : (
         <>
-          <DateDivider label="Today" />
+          <DateDivider date={messages?.[0]?.timestamp} />
           <div className="flex flex-col gap-1 pb-2">
             <AnimatePresence mode="popLayout">
               {messages?.map((msg) => (

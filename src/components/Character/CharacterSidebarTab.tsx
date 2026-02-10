@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { motion, useMotionValue, useAnimation, type PanInfo } from "framer-motion";
 import { Plus, User, MessageSquare, Pencil, Trash2, MoreVertical } from "lucide-react";
@@ -39,13 +39,13 @@ export function CharacterSidebarTab({ onSelectCharacter, activeCharacterId }: Ch
             <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
               <User className="w-8 h-8 text-zinc-600" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">No Characters Yet</h3>
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">No Characters Yet</h3>
             <p className="text-sm text-zinc-400 mb-6">
               Create your first AI character to start personalized conversations.
             </p>
             <button
               onClick={() => setShowWizard(true)}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-sm"
+              className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white rounded-lg transition-colors text-sm"
             >
               Get Started
             </button>
@@ -113,8 +113,21 @@ interface CharacterCardProps {
 function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: CharacterCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [swiped, setSwiped] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const x = useMotionValue(0);
   const controls = useAnimation();
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [showMenu]);
   const threadCount = useLiveQuery(
     async () => {
       if (!character.id) return 0;
@@ -124,7 +137,7 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
     0
   );
 
-  const SWIPE_THRESHOLD = -60;
+  const SWIPE_THRESHOLD = -40;
   const ACTION_WIDTH = 70;
 
   const handleDragEnd = (_: any, info: PanInfo) => {
@@ -144,22 +157,25 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
 
   return (
     <div className="relative overflow-hidden rounded-lg">
-      {/* Delete button revealed behind */}
-      <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
-        <button
-          type="button"
-          onClick={async () => {
-            closeSwipe();
-            if (character.id && confirm(`Delete ${character.name}? This will also delete all associated chats.`)) {
-              await deleteCharacter(character.id);
-            }
-          }}
-          className="flex items-center justify-center w-[70px] bg-red-600 text-white text-[11px] font-medium gap-1 flex-col"
-        >
-          <Trash2 size={16} />
-          Delete
-        </button>
-      </div>
+      {/* Delete button revealed behind — only mounted when swiped */}
+      {swiped && (
+        <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
+          <button
+            type="button"
+            aria-label={`Delete ${character.name}`}
+            onClick={async () => {
+              closeSwipe();
+              if (character.id && confirm(`Delete ${character.name}? This will also delete all associated chats.`)) {
+                await deleteCharacter(character.id);
+              }
+            }}
+            className="flex items-center justify-center w-[70px] bg-red-600 text-white text-[11px] font-medium gap-1 flex-col"
+          >
+            <Trash2 size={16} />
+            Delete
+          </button>
+        </div>
+      )}
 
       {/* Swipeable foreground */}
       <motion.button
@@ -179,7 +195,7 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
         className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left relative z-10 ${
           isActive
             ? "bg-blue-600/20 border border-blue-600/50"
-            : "bg-zinc-800 hover:bg-zinc-700 border border-transparent"
+            : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 border border-transparent"
         }`}
       >
         {/* Avatar */}
@@ -205,7 +221,7 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
 
         {/* Details */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-white truncate">{character.name}</h3>
+          <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">{character.name}</h3>
           <p className="text-xs text-zinc-400 truncate">{character.subtitle || character.description}</p>
         </div>
 
@@ -220,7 +236,10 @@ function CharacterCard({ character, isActive, onClick, onEdit, onViewProfile }: 
 
       {/* Context Menu */}
       {showMenu && (
-        <div className="absolute right-2 top-full mt-1 z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]">
+        <div
+          ref={menuRef}
+          className="absolute right-2 top-full mt-1 z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-[160px]"
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
